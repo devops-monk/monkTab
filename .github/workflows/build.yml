@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: rm -f package-lock.json && npm install
+
+      - run: npm run build
+
+      - name: Create zip
+        run: cd dist && zip -r ../monktab.zip . && cd ..
+
+      - name: Publish rolling release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest build"
+          prerelease: true
+          make_latest: true
+          body: |
+            Automated build from `main`. Commit: ${{ github.sha }}
+
+            **Install:**
+            1. Download `monktab.zip`
+            2. Unzip it
+            3. Open `chrome://extensions` → Enable Developer Mode
+            4. Click **Load unpacked** → select the unzipped folder
+            5. Open a new tab!
+          files: monktab.zip

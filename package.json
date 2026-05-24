@@ -1,0 +1,18 @@
+{
+  "name": "monktab",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "description": "A beautiful, privacy-first new tab for developers — by DevOps-Monk",
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.4.0",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/chrome": "^0.1.42",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14",
+    "vite-plugin-web-extension": "^4.5.0"
+  }
+}

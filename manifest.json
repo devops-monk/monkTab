@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "MonkTab — Developer New Tab",
+  "short_name": "MonkTab",
+  "version": "1.0.0",
+  "description": "A beautiful, privacy-first new tab for developers. Clock, focus goal, todos, weather, quick links & Pomodoro — no account needed.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "chrome_url_overrides": {
+    "newtab": "src/newtab/newtab.html"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "options_page": "src/options/options.html",
+  "permissions": [
+    "storage",
+    "geolocation",
+    "notifications",
+    "bookmarks"
+  ],
+  "host_permissions": [
+    "https://api.unsplash.com/*",
+    "https://api.open-meteo.com/*",
+    "https://api.quotable.io/*",
+    "https://geocoding-api.open-meteo.com/*"
+  ]
+}
