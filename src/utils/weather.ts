@@ -25,63 +25,94 @@ function getCondition(code: number) {
   return WMO_CODES[code] ?? { label: 'Unknown', icon: '🌡️' };
 }
 
-export async function fetchWeather(): Promise<WeatherCache | null> {
-  const cached = await getWeatherCache();
-  if (cached && Date.now() - cached.cachedAt < 30 * 60 * 1000) return cached;
+async function fetchWeatherForCoords(lat: number, lon: number, city: string): Promise<WeatherCache> {
+  const wxRes = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code` +
+    `&wind_speed_unit=kmh&temperature_unit=celsius`
+  );
+  const wxData = await wxRes.json() as {
+    current: {
+      temperature_2m: number;
+      apparent_temperature: number;
+      precipitation: number;
+      wind_speed_10m: number;
+      weather_code: number;
+    };
+  };
+  const c = wxData.current;
+  const { label, icon } = getCondition(c.weather_code);
+  return {
+    temp: Math.round(c.temperature_2m),
+    feelsLike: Math.round(c.apparent_temperature),
+    windSpeed: Math.round(c.wind_speed_10m),
+    precipitation: Math.round(c.precipitation * 10) / 10,
+    condition: label,
+    icon,
+    city,
+    cachedAt: Date.now(),
+  };
+}
 
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude: lat, longitude: lon } = pos.coords;
-
-          // Reverse geocode city name via Nominatim
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          const geoData = await geoRes.json() as {
-            address?: { city?: string; town?: string; village?: string; county?: string; country?: string };
-          };
-          const a = geoData.address ?? {};
-          const city = a.city ?? a.town ?? a.village ?? a.county ?? 'Your location';
-
-          // Weather — fetch extra fields for expanded card
-          const wxRes = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-            `&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code` +
-            `&wind_speed_unit=kmh&temperature_unit=celsius`
-          );
-          const wxData = await wxRes.json() as {
-            current: {
-              temperature_2m: number;
-              apparent_temperature: number;
-              precipitation: number;
-              wind_speed_10m: number;
-              weather_code: number;
-            };
-          };
-          const c = wxData.current;
-          const { label, icon } = getCondition(c.weather_code);
-
-          const w: WeatherCache = {
-            temp: Math.round(c.temperature_2m),
-            feelsLike: Math.round(c.apparent_temperature),
-            windSpeed: Math.round(c.wind_speed_10m),
-            precipitation: Math.round(c.precipitation * 10) / 10,
-            condition: label,
-            icon,
-            city,
-            cachedAt: Date.now(),
-          };
-          await saveWeatherCache(w);
-          resolve(w);
-        } catch {
-          resolve(null);
-        }
-      },
-      () => resolve(null),
-      { timeout: 5000 },
+// Geocode a city name → { lat, lon, name } via Open-Meteo geocoding API
+async function geocodeCity(name: string): Promise<{ lat: number; lon: number; city: string } | null> {
+  try {
+    const res = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`
     );
-  });
+    const data = await res.json() as { results?: Array<{ latitude: number; longitude: number; name: string; country: string }> };
+    const r = data.results?.[0];
+    if (!r) return null;
+    return { lat: r.latitude, lon: r.longitude, city: `${r.name}, ${r.country}` };
+  } catch { return null; }
+}
+
+// locationOverride: if non-empty, geocode it instead of using GPS
+export async function fetchWeather(locationOverride = ''): Promise<WeatherCache | null> {
+  const cached = await getWeatherCache();
+
+  // Use cache only if location override hasn't changed
+  if (cached && Date.now() - cached.cachedAt < 30 * 60 * 1000) {
+    // If override is set but cached city doesn't reflect it, bust the cache
+    const overrideName = locationOverride.trim().toLowerCase();
+    if (!overrideName || cached.city.toLowerCase().includes(overrideName.split(',')[0].trim())) {
+      return cached;
+    }
+  }
+
+  try {
+    // ── Path 1: manual location override ──────────────────────────────────────
+    if (locationOverride.trim()) {
+      const geo = await geocodeCity(locationOverride.trim());
+      if (!geo) return cached ?? null;
+      const w = await fetchWeatherForCoords(geo.lat, geo.lon, geo.city);
+      await saveWeatherCache(w);
+      return w;
+    }
+
+    // ── Path 2: device GPS (ignores VPN — expected behaviour) ─────────────────
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const { latitude: lat, longitude: lon } = pos.coords;
+            const geoRes = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+              { headers: { 'Accept-Language': 'en' } }
+            );
+            const geoData = await geoRes.json() as {
+              address?: { city?: string; town?: string; village?: string; county?: string };
+            };
+            const a = geoData.address ?? {};
+            const city = a.city ?? a.town ?? a.village ?? a.county ?? 'Your location';
+            const w = await fetchWeatherForCoords(lat, lon, city);
+            await saveWeatherCache(w);
+            resolve(w);
+          } catch { resolve(cached ?? null); }
+        },
+        () => resolve(cached ?? null),
+        { timeout: 5000 },
+      );
+    });
+  } catch { return cached ?? null; }
 }

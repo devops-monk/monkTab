@@ -20,6 +20,7 @@ export interface Settings {
   customBackgrounds: string[]; // data URLs, max 6
   activeBackground: 'daily' | 'custom';
   activeCustomBg: number; // index into customBackgrounds
+  locationOverride: string; // empty = use device GPS
 }
 
 export interface Todo {
@@ -104,6 +105,7 @@ const DEFAULTS: Settings = {
   customBackgrounds: [],
   activeBackground: 'daily',
   activeCustomBg: 0,
+  locationOverride: '',
 };
 
 export async function getSettings(): Promise<Settings> {

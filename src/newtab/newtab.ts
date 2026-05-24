@@ -77,8 +77,8 @@ function initQuoteRefresh() {
 
 // ─── Weather ──────────────────────────────────────────────────────────────────
 
-async function loadWeather() {
-  const w = await fetchWeather();
+async function loadWeather(locationOverride = '') {
+  const w = await fetchWeather(locationOverride);
   if (!w) return;
 
   // Topbar badge
@@ -1475,6 +1475,17 @@ function initSettingsPanel(settings: Settings) {
   initSegmented('seg-engine', 'set-engine');
 
   (document.getElementById('set-weather') as HTMLInputElement).checked = settings.showWeather;
+  (document.getElementById('set-location') as HTMLInputElement).value = settings.locationOverride ?? '';
+
+  // Apply location override on button click — busts cache and re-fetches immediately
+  document.getElementById('set-location-save')?.addEventListener('click', async () => {
+    const override = (document.getElementById('set-location') as HTMLInputElement).value.trim();
+    await saveSettings({ locationOverride: override });
+    await chrome.storage.local.remove('mt_weather'); // bust cache
+    if (settings.showWeather) void loadWeather(override);
+    const btn = document.getElementById('set-location-save') as HTMLButtonElement;
+    btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'Apply'; }, 1500);
+  });
   (document.getElementById('set-quote') as HTMLInputElement).checked = settings.showQuote;
   (document.getElementById('set-todos') as HTMLInputElement).checked = settings.showTodos;
   (document.getElementById('set-links') as HTMLInputElement).checked = settings.showLinks;
@@ -1633,7 +1644,7 @@ async function init() {
   // Async non-blocking
   loadBackground(settings);
   if (settings.showQuote) loadQuote();
-  if (settings.showWeather) loadWeather();
+  if (settings.showWeather) void loadWeather(settings.locationOverride ?? '');
   if (settings.showGithub) loadGithub(settings.githubUsername, settings.githubToken);
 
   document.getElementById('btn-github-refresh')?.addEventListener('click', () => {
