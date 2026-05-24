@@ -634,18 +634,68 @@ function renderClocksConfig(clocks: WorldClock[]) {
 
 // ─── Settings panel ───────────────────────────────────────────────────────────
 
-function initSettingsPanel(settings: Settings) {
-  const panel = document.getElementById('settings-panel') as HTMLElement;
-  document.getElementById('btn-settings')?.addEventListener('click', () => {
-    panel.classList.toggle('hidden', false);
-    panel.classList.toggle('open');
+function initSegmented(groupId: string, selectId: string) {
+  const group = document.getElementById(groupId);
+  const select = document.getElementById(selectId) as HTMLSelectElement;
+  if (!group || !select) return;
+  const sync = () => {
+    group.querySelectorAll<HTMLButtonElement>('.seg-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset['val'] === select.value));
+  };
+  sync();
+  group.querySelectorAll<HTMLButtonElement>('.seg-btn').forEach(b => {
+    b.addEventListener('click', () => { select.value = b.dataset['val'] ?? ''; sync(); });
   });
-  document.getElementById('btn-settings-close')?.addEventListener('click', () => panel.classList.remove('open'));
+}
 
-  // Populate
+function initSettingsPanel(settings: Settings) {
+  const overlay = document.getElementById('settings-panel') as HTMLElement;
+
+  const open = () => overlay.classList.remove('hidden');
+  const close = () => overlay.classList.add('hidden');
+
+  document.getElementById('btn-settings')?.addEventListener('click', open);
+  document.getElementById('btn-settings-close')?.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  // Category switching
+  overlay.querySelectorAll<HTMLButtonElement>('.sn-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('.sn-item').forEach(b => b.classList.remove('active'));
+      overlay.querySelectorAll('.sc').forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+      overlay.querySelector<HTMLElement>(`.sc[data-cat="${btn.dataset['cat']}"]`)?.classList.add('active');
+    });
+  });
+
+  // Segmented controls
+  initSegmented('seg-theme', 'set-theme');
+  initSegmented('seg-engine', 'set-engine');
+  initSegmented('seg-bg', 'seg-bg-hidden');
+
+  // Background segmented syncs to radio buttons
+  const segBg = document.getElementById('seg-bg');
+  segBg?.querySelectorAll<HTMLButtonElement>('.seg-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const val = b.dataset['val'];
+      const radio = document.getElementById(val === 'custom' ? 'bg-custom' : 'bg-daily') as HTMLInputElement;
+      if (radio) radio.checked = true;
+    });
+  });
+
+  // AI provider radio cards sync to hidden select
+  const aiSelect = document.getElementById('set-ai-provider') as HTMLSelectElement;
+  overlay.querySelectorAll<HTMLInputElement>('input[name="ai-provider-radio"]').forEach(r => {
+    r.addEventListener('change', () => { aiSelect.value = r.value; });
+  });
+
+  // Populate values
   (document.getElementById('set-name') as HTMLInputElement).value = settings.name;
   (document.getElementById('set-engine') as HTMLSelectElement).value = settings.searchEngine;
   (document.getElementById('set-theme') as HTMLSelectElement).value = settings.theme;
+  initSegmented('seg-theme', 'set-theme');
+  initSegmented('seg-engine', 'set-engine');
+
   (document.getElementById('set-weather') as HTMLInputElement).checked = settings.showWeather;
   (document.getElementById('set-quote') as HTMLInputElement).checked = settings.showQuote;
   (document.getElementById('set-todos') as HTMLInputElement).checked = settings.showTodos;
@@ -659,19 +709,26 @@ function initSettingsPanel(settings: Settings) {
   (document.getElementById('set-unsplash') as HTMLInputElement).value = settings.unsplashKey;
   (document.getElementById('set-gh-user') as HTMLInputElement).value = settings.githubUsername;
   (document.getElementById('set-gh-token') as HTMLInputElement).value = settings.githubToken;
-  (document.getElementById('set-ai-provider') as HTMLSelectElement).value = settings.aiProvider;
+  aiSelect.value = settings.aiProvider;
+
+  // Sync AI provider radio
+  const aiRadio = overlay.querySelector<HTMLInputElement>(`input[name="ai-provider-radio"][value="${settings.aiProvider}"]`);
+  if (aiRadio) aiRadio.checked = true;
+
+  // Background mode
+  const bgMode = settings.activeBackground === 'custom' ? 'bg-custom' : 'bg-daily';
+  (document.getElementById(bgMode) as HTMLInputElement).checked = true;
+  segBg?.querySelectorAll<HTMLButtonElement>('.seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset['val'] === settings.activeBackground));
 
   const clonedClocks = settings.worldClocks.map(c => ({ ...c }));
   renderClocksConfig(clonedClocks);
-  // Preset dropdown
+
   document.getElementById('tz-preset')?.addEventListener('change', (e) => {
     const val = (e.target as HTMLSelectElement).value;
     if (!val) return;
     const [label, timezone] = val.split('|');
-    if (label && timezone) {
-      clonedClocks.push({ label, timezone });
-      renderClocksConfig(clonedClocks);
-    }
+    if (label && timezone) { clonedClocks.push({ label, timezone }); renderClocksConfig(clonedClocks); }
     (e.target as HTMLSelectElement).value = '';
   });
 
@@ -695,13 +752,13 @@ function initSettingsPanel(settings: Settings) {
       unsplashKey: (document.getElementById('set-unsplash') as HTMLInputElement).value.trim(),
       githubUsername: (document.getElementById('set-gh-user') as HTMLInputElement).value.trim(),
       githubToken: (document.getElementById('set-gh-token') as HTMLInputElement).value.trim(),
-      aiProvider: (document.getElementById('set-ai-provider') as HTMLSelectElement).value as 'claude' | 'chatgpt' | 'gemini',
+      aiProvider: aiSelect.value as 'claude' | 'chatgpt' | 'gemini',
       worldClocks: clonedClocks.filter(c => c.label && c.timezone),
       customBackgrounds: settings.customBackgrounds,
       activeBackground: (document.querySelector('input[name="bg-mode"]:checked') as HTMLInputElement)?.value as 'daily' | 'custom' ?? settings.activeBackground,
       activeCustomBg: settings.activeCustomBg,
     });
-    panel.classList.remove('open');
+    close();
     location.reload();
   });
 }

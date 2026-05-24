@@ -220,119 +220,328 @@
     </div>
   </div>
 
-  <!-- Settings panel (slide from right) -->
-  <aside id="settings-panel" class="settings-panel hidden">
-    <div class="panel-header">
-      <span>Settings</span>
-      <button id="btn-settings-close" class="icon-btn-sm">✕</button>
-    </div>
-    <div class="settings-body">
+  <!-- Settings full-screen modal -->
+  <div id="settings-panel" class="settings-overlay hidden">
+    <div class="settings-modal">
 
-      <div class="settings-section">Profile</div>
-      <label class="setting-row">
-        Your name
-        <input id="set-name" type="text" placeholder="Abhay" maxlength="30" />
-      </label>
-      <label class="setting-row">
-        Search engine
-        <select id="set-engine">
-          <option value="google">Google</option>
-          <option value="duckduckgo">DuckDuckGo</option>
-          <option value="bing">Bing</option>
-        </select>
-      </label>
-      <label class="setting-row">
-        Theme
-        <select id="set-theme">
-          <option value="auto">Auto</option>
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-        </select>
-      </label>
-
-      <div class="settings-section">Widgets</div>
-      <div class="setting-toggles">
-        <label class="toggle-row"><input type="checkbox" id="set-weather" /> Weather</label>
-        <label class="toggle-row"><input type="checkbox" id="set-quote" /> Daily quote</label>
-        <label class="toggle-row"><input type="checkbox" id="set-todos" /> Tasks</label>
-        <label class="toggle-row"><input type="checkbox" id="set-links" /> Quick links</label>
-        <label class="toggle-row"><input type="checkbox" id="set-pomodoro" /> Pomodoro timer</label>
-        <label class="toggle-row"><input type="checkbox" id="set-notes" /> Notes</label>
-        <label class="toggle-row"><input type="checkbox" id="set-clocks" /> World clocks</label>
-        <label class="toggle-row"><input type="checkbox" id="set-countdowns" /> Countdowns</label>
-        <label class="toggle-row"><input type="checkbox" id="set-github" /> GitHub activity</label>
-        <label class="toggle-row"><input type="checkbox" id="set-ai" /> Ask AI</label>
-      </div>
-
-      <div class="settings-section">Background</div>
-      <div class="setting-row">
-        <span>Background mode</span>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <label class="toggle-row"><input type="radio" name="bg-mode" id="bg-daily" value="daily" /> Daily photo</label>
-          <label class="toggle-row"><input type="radio" name="bg-mode" id="bg-custom" value="custom" /> My photos</label>
+      <!-- Left sidebar nav -->
+      <nav class="settings-nav">
+        <div class="settings-nav-brand">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
         </div>
-      </div>
-      <div class="vision-board">
-        <div id="custom-bg-grid" class="custom-bg-grid"></div>
-        <label class="upload-btn">
-          + Upload photo
-          <input id="bg-upload" type="file" accept="image/*" hidden />
-        </label>
-      </div>
-      <label class="setting-row">
-        Unsplash API key <small>(optional)</small>
-        <input id="set-unsplash" type="text" placeholder="Paste key…" />
-      </label>
+        <button class="sn-item active" data-cat="general">General</button>
+        <button class="sn-item" data-cat="widgets">Widgets</button>
+        <button class="sn-item" data-cat="appearance">Appearance</button>
+        <button class="sn-item" data-cat="clocks">World Clocks</button>
+        <button class="sn-item" data-cat="github">GitHub</button>
+        <button class="sn-item" data-cat="ai">AI</button>
+        <div class="settings-nav-spacer"></div>
+        <button id="btn-settings-save" class="sn-save-btn">Save & Close</button>
+      </nav>
 
-      <div class="settings-section">GitHub</div>
-      <label class="setting-row">
-        GitHub username
-        <input id="set-gh-user" type="text" placeholder="devops-monk" />
-      </label>
-      <label class="setting-row">
-        GitHub token <small>(for private repos)</small>
-        <input id="set-gh-token" type="password" placeholder="ghp_…" />
-      </label>
+      <!-- Right content -->
+      <div class="settings-content">
+        <button id="btn-settings-close" class="settings-close-btn" title="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
 
-      <div class="settings-section">World Clocks</div>
-      <div id="clocks-config" class="clocks-chips"></div>
-      <select id="tz-preset" class="setting-select" style="margin-top:4px">
-        <option value="">＋ Add a city…</option>
-        <option value="London|Europe/London">🇬🇧 London</option>
-        <option value="New York|America/New_York">🇺🇸 New York</option>
-        <option value="Los Angeles|America/Los_Angeles">🇺🇸 Los Angeles</option>
-        <option value="Chicago|America/Chicago">🇺🇸 Chicago</option>
-        <option value="Toronto|America/Toronto">🇨🇦 Toronto</option>
-        <option value="São Paulo|America/Sao_Paulo">🇧🇷 São Paulo</option>
-        <option value="Paris|Europe/Paris">🇫🇷 Paris</option>
-        <option value="Berlin|Europe/Berlin">🇩🇪 Berlin</option>
-        <option value="Amsterdam|Europe/Amsterdam">🇳🇱 Amsterdam</option>
-        <option value="Dubai|Asia/Dubai">🇦🇪 Dubai</option>
-        <option value="Mumbai|Asia/Kolkata">🇮🇳 Mumbai / Delhi</option>
-        <option value="Singapore|Asia/Singapore">🇸🇬 Singapore</option>
-        <option value="Tokyo|Asia/Tokyo">🇯🇵 Tokyo</option>
-        <option value="Sydney|Australia/Sydney">🇦🇺 Sydney</option>
-        <option value="Auckland|Pacific/Auckland">🇳🇿 Auckland</option>
-        <option value="Beijing|Asia/Shanghai">🇨🇳 Beijing</option>
-        <option value="Seoul|Asia/Seoul">🇰🇷 Seoul</option>
-        <option value="Nairobi|Africa/Nairobi">🇰🇪 Nairobi</option>
-        <option value="Cairo|Africa/Cairo">🇪🇬 Cairo</option>
-        <option value="Lagos|Africa/Lagos">🇳🇬 Lagos</option>
-      </select>
+        <!-- General -->
+        <section class="sc active" data-cat="general">
+          <h2 class="sc-title">General</h2>
+          <p class="sc-desc">Personalize your MonkTab experience</p>
 
-      <div class="settings-section">AI</div>
-      <label class="setting-row">
-        Default AI provider
-        <select id="set-ai-provider">
-          <option value="claude">Claude (Anthropic)</option>
-          <option value="chatgpt">ChatGPT (OpenAI)</option>
-          <option value="gemini">Gemini (Google)</option>
-        </select>
-      </label>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Your name</span>
+                <span class="set-row-desc">Used in your greeting each day</span>
+              </div>
+              <input id="set-name" class="set-input" type="text" placeholder="Abhay" maxlength="30" />
+            </div>
+          </div>
 
-    </div>
-    <button id="btn-settings-save" class="save-btn">Save Settings</button>
-  </aside>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Theme</span>
+                <span class="set-row-desc">Choose light, dark, or follow system</span>
+              </div>
+              <div class="set-seg" id="seg-theme">
+                <button class="seg-btn active" data-val="auto">Auto</button>
+                <button class="seg-btn" data-val="dark">Dark</button>
+                <button class="seg-btn" data-val="light">Light</button>
+              </div>
+              <select id="set-theme" class="set-hidden-select">
+                <option value="auto">Auto</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Search engine</span>
+                <span class="set-row-desc">Default when searching from the tab</span>
+              </div>
+              <div class="set-seg" id="seg-engine">
+                <button class="seg-btn active" data-val="google">Google</button>
+                <button class="seg-btn" data-val="duckduckgo">DuckDuckGo</button>
+                <button class="seg-btn" data-val="bing">Bing</button>
+              </div>
+              <select id="set-engine" class="set-hidden-select">
+                <option value="google">Google</option>
+                <option value="duckduckgo">DuckDuckGo</option>
+                <option value="bing">Bing</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Widgets -->
+        <section class="sc" data-cat="widgets">
+          <h2 class="sc-title">Widgets</h2>
+          <p class="sc-desc">Choose what shows on your new tab</p>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Weather</span>
+                <span class="set-row-desc">Current temperature and conditions</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-weather" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Daily quote</span>
+                <span class="set-row-desc">Inspirational quote below your focus</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-quote" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Tasks</span>
+                <span class="set-row-desc">Your to-do list in the bottom right</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-todos" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Quick links</span>
+                <span class="set-row-desc">Bookmarked shortcuts in the sidebar</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-links" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Pomodoro timer</span>
+                <span class="set-row-desc">Focus and break intervals</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-pomodoro" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Notes</span>
+                <span class="set-row-desc">Quick scratchpad that auto-saves</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-notes" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">World clocks</span>
+                <span class="set-row-desc">Multiple time zones in the top bar</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-clocks" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Countdowns</span>
+                <span class="set-row-desc">Days until your events</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-countdowns" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">GitHub activity</span>
+                <span class="set-row-desc">Your open pull requests at a glance</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-github" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-divider"></div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Ask AI</span>
+                <span class="set-row-desc">Quick AI chat from your new tab</span>
+              </div>
+              <label class="sw"><input type="checkbox" id="set-ai" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+          </div>
+        </section>
+
+        <!-- Appearance -->
+        <section class="sc" data-cat="appearance">
+          <h2 class="sc-title">Appearance</h2>
+          <p class="sc-desc">Customize your background photo</p>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Background source</span>
+                <span class="set-row-desc">Use a daily Picsum photo or upload your own</span>
+              </div>
+              <div class="set-seg" id="seg-bg">
+                <button class="seg-btn active" data-val="daily">Daily photo</button>
+                <button class="seg-btn" data-val="custom">My photos</button>
+              </div>
+              <div style="display:none">
+                <input type="radio" name="bg-mode" id="bg-daily" value="daily" />
+                <input type="radio" name="bg-mode" id="bg-custom" value="custom" />
+              </div>
+            </div>
+          </div>
+
+          <div class="set-card">
+            <div class="set-row-info" style="padding:0 0 10px">
+              <span class="set-row-title">My photos</span>
+              <span class="set-row-desc">Upload your own backgrounds (vision board)</span>
+            </div>
+            <div id="custom-bg-grid" class="custom-bg-grid"></div>
+            <label class="upload-btn" style="margin-top:10px">
+              + Upload photo
+              <input id="bg-upload" type="file" accept="image/*" hidden />
+            </label>
+          </div>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Unsplash API key</span>
+                <span class="set-row-desc">Optional — for curated nature photos</span>
+              </div>
+            </div>
+            <input id="set-unsplash" class="set-input set-input-full" type="text" placeholder="Paste your Unsplash access key…" />
+          </div>
+        </section>
+
+        <!-- World Clocks -->
+        <section class="sc" data-cat="clocks">
+          <h2 class="sc-title">World Clocks</h2>
+          <p class="sc-desc">Add cities to the clock bar at the top</p>
+
+          <div class="set-card">
+            <div class="set-row-info" style="padding:0 0 12px">
+              <span class="set-row-title">Your clocks</span>
+            </div>
+            <div id="clocks-config" class="clocks-chips"></div>
+            <select id="tz-preset" class="set-select" style="margin-top:12px">
+              <option value="">＋ Add a city…</option>
+              <option value="London|Europe/London">🇬🇧 London</option>
+              <option value="New York|America/New_York">🇺🇸 New York</option>
+              <option value="Los Angeles|America/Los_Angeles">🇺🇸 Los Angeles</option>
+              <option value="Chicago|America/Chicago">🇺🇸 Chicago</option>
+              <option value="Toronto|America/Toronto">🇨🇦 Toronto</option>
+              <option value="São Paulo|America/Sao_Paulo">🇧🇷 São Paulo</option>
+              <option value="Paris|Europe/Paris">🇫🇷 Paris</option>
+              <option value="Berlin|Europe/Berlin">🇩🇪 Berlin</option>
+              <option value="Amsterdam|Europe/Amsterdam">🇳🇱 Amsterdam</option>
+              <option value="Dubai|Asia/Dubai">🇦🇪 Dubai</option>
+              <option value="Mumbai|Asia/Kolkata">🇮🇳 Mumbai / Delhi</option>
+              <option value="Singapore|Asia/Singapore">🇸🇬 Singapore</option>
+              <option value="Tokyo|Asia/Tokyo">🇯🇵 Tokyo</option>
+              <option value="Sydney|Australia/Sydney">🇦🇺 Sydney</option>
+              <option value="Auckland|Pacific/Auckland">🇳🇿 Auckland</option>
+              <option value="Beijing|Asia/Shanghai">🇨🇳 Beijing</option>
+              <option value="Seoul|Asia/Seoul">🇰🇷 Seoul</option>
+              <option value="Nairobi|Africa/Nairobi">🇰🇪 Nairobi</option>
+              <option value="Cairo|Africa/Cairo">🇪🇬 Cairo</option>
+              <option value="Lagos|Africa/Lagos">🇳🇬 Lagos</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- GitHub -->
+        <section class="sc" data-cat="github">
+          <h2 class="sc-title">GitHub</h2>
+          <p class="sc-desc">See your open pull requests on every new tab</p>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">GitHub username</span>
+                <span class="set-row-desc">Your GitHub handle</span>
+              </div>
+            </div>
+            <input id="set-gh-user" class="set-input set-input-full" type="text" placeholder="devops-monk" />
+          </div>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Personal access token</span>
+                <span class="set-row-desc">Optional — needed for private repos</span>
+              </div>
+            </div>
+            <input id="set-gh-token" class="set-input set-input-full" type="password" placeholder="ghp_…" />
+          </div>
+        </section>
+
+        <!-- AI -->
+        <section class="sc" data-cat="ai">
+          <h2 class="sc-title">AI</h2>
+          <p class="sc-desc">Configure your Ask AI assistant</p>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Default provider</span>
+                <span class="set-row-desc">Which AI opens when you press Ask</span>
+              </div>
+            </div>
+            <div class="ai-provider-grid">
+              <label class="ai-provider-card">
+                <input type="radio" name="ai-provider-radio" value="claude" id="set-ai-provider-claude" />
+                <span class="ai-provider-card-inner">
+                  <span class="ai-provider-icon">🤖</span>
+                  <span class="ai-provider-name">Claude</span>
+                  <span class="ai-provider-by">Anthropic</span>
+                </span>
+              </label>
+              <label class="ai-provider-card">
+                <input type="radio" name="ai-provider-radio" value="chatgpt" id="set-ai-provider-chatgpt" />
+                <span class="ai-provider-card-inner">
+                  <span class="ai-provider-icon">✨</span>
+                  <span class="ai-provider-name">ChatGPT</span>
+                  <span class="ai-provider-by">OpenAI</span>
+                </span>
+              </label>
+              <label class="ai-provider-card">
+                <input type="radio" name="ai-provider-radio" value="gemini" id="set-ai-provider-gemini" />
+                <span class="ai-provider-card-inner">
+                  <span class="ai-provider-icon">♊</span>
+                  <span class="ai-provider-name">Gemini</span>
+                  <span class="ai-provider-by">Google</span>
+                </span>
+              </label>
+            </div>
+            <select id="set-ai-provider" class="set-hidden-select">
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="chatgpt">ChatGPT (OpenAI)</option>
+              <option value="gemini">Gemini (Google)</option>
+            </select>
+          </div>
+        </section>
+
+      </div><!-- end settings-content -->
+    </div><!-- end settings-modal -->
+  </div><!-- end settings-overlay -->
 
   <!-- Background cycle button -->
   <button id="btn-bg-cycle" class="bg-cycle-btn" title="Next background">
