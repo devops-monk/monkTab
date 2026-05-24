@@ -26,7 +26,6 @@
     "declarativeNetRequest"
   ],
   "host_permissions": [
-    "https://api.unsplash.com/*",
     "https://api.open-meteo.com/*",
     "https://api.quotable.io/*",
     "https://geocoding-api.open-meteo.com/*",
@@ -34,8 +33,6 @@
     "https://picsum.photos/*",
     "https://fastly.picsum.photos/*",
     "https://img.youtube.com/*",
-    "https://www.youtube.com/*",
-    "https://www.youtube-nocookie.com/*",
-    "https://cdn.pixabay.com/*"
+    "https://www.youtube-nocookie.com/*"
   ]
 }

@@ -1,119 +1,81 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
 
-    <!-- ── Background: near-black with a rich violet bloom upper-left ── -->
+    <!-- Background: deep violet bloom upper-left -->
     <radialGradient id="bg-bloom" cx="28%" cy="22%" r="70%">
       <stop offset="0%"   stop-color="#3b1280"/>
       <stop offset="45%"  stop-color="#160636"/>
       <stop offset="100%" stop-color="#05000f"/>
     </radialGradient>
 
-    <!-- Secondary warm-violet fill for the lower half -->
-    <radialGradient id="bg-low" cx="75%" cy="90%" r="55%">
-      <stop offset="0%"   stop-color="#2e0f68" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#2e0f68" stop-opacity="0"/>
+    <!-- Warm glow behind M centre -->
+    <radialGradient id="m-glow" cx="50%" cy="55%" r="48%">
+      <stop offset="0%"   stop-color="#5b21b6" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#5b21b6" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Top-right specular highlight -->
+    <!-- Top-right specular -->
     <radialGradient id="spec" cx="80%" cy="8%" r="40%">
       <stop offset="0%"   stop-color="#c4b5fd" stop-opacity="0.22"/>
       <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- M soft-bloom glow (purple layer behind white shape) -->
-    <filter id="m-bloom" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="22" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <!-- M gradient: bright white top → soft lavender bottom -->
+    <linearGradient id="m-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e9d8ff"/>
+    </linearGradient>
 
-    <!-- Sharper inner glow on white M -->
-    <filter id="m-crisp" x="-8%" y="-8%" width="116%" height="116%">
-      <feGaussianBlur stdDeviation="5" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-
-    <!-- Dot glow -->
-    <filter id="dot-glow" x="-200%" y="-200%" width="500%" height="500%">
+    <!-- Dot glow filter (simple, works in ImageMagick) -->
+    <filter id="dot-glow" x="-150%" y="-150%" width="400%" height="400%">
       <feGaussianBlur stdDeviation="9" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-
-    <!-- M gradient: bright white top → soft lavender bottom -->
-    <linearGradient id="m-fill" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#e9d8ff" stop-opacity="0.93"/>
-    </linearGradient>
 
     <!-- Clip to rounded square -->
     <clipPath id="frame"><rect width="512" height="512" rx="114"/></clipPath>
 
   </defs>
 
-  <!-- ── Background layers ── -->
+  <!-- Background layers -->
   <g clip-path="url(#frame)">
     <rect width="512" height="512" fill="url(#bg-bloom)"/>
-    <rect width="512" height="512" fill="url(#bg-low)"/>
+    <rect width="512" height="512" fill="url(#m-glow)"/>
     <rect width="512" height="512" fill="url(#spec)"/>
 
-    <!-- Subtle noise-like inner vignette ring -->
+    <!-- Subtle ring decoration -->
     <circle cx="256" cy="256" r="210" fill="none"
-      stroke="#7c3aed" stroke-width="1" opacity="0.12"/>
+      stroke="#7c3aed" stroke-width="1.5" opacity="0.15"/>
     <circle cx="256" cy="256" r="238" fill="none"
-      stroke="#7c3aed" stroke-width="0.6" opacity="0.07"/>
+      stroke="#7c3aed" stroke-width="0.8" opacity="0.08"/>
 
-    <!-- Thin partial arc — suggests a focus/timer ring, rotated so it's asymmetric -->
-    <circle cx="256" cy="256" r="196" fill="none"
-      stroke="url(#arc-grad)" stroke-width="2.5"
-      stroke-dasharray="880 350"
-      stroke-linecap="round"
-      opacity="0.28"
-      transform="rotate(-110 256 256)"/>
+    <!-- Purple M shadow/ghost — solid, no filter, slightly offset -->
+    <path d="M 92,382 L 92,138 L 256,290 L 420,138 L 420,382
+             L 368,382 L 368,228 L 256,346 L 144,228 L 144,382 Z"
+      fill="#7c3aed" opacity="0.35" transform="translate(0, 8)"/>
+
+    <!-- White M — clean, no filter, full opacity -->
+    <path d="M 92,382 L 92,138 L 256,290 L 420,138 L 420,382
+             L 368,382 L 368,228 L 256,346 L 144,228 L 144,382 Z"
+      fill="url(#m-fill)"/>
+
+    <!-- Peak accent dots -->
+    <!-- Left dot glow -->
+    <circle cx="92" cy="125" r="26" fill="#8b5cf6" opacity="0.5"/>
+    <circle cx="92" cy="125" r="18" fill="#8b5cf6" opacity="0.8"/>
+    <circle cx="92" cy="125" r="14" fill="#ddd6fe"/>
+
+    <!-- Right dot glow -->
+    <circle cx="420" cy="125" r="26" fill="#8b5cf6" opacity="0.5"/>
+    <circle cx="420" cy="125" r="18" fill="#8b5cf6" opacity="0.8"/>
+    <circle cx="420" cy="125" r="14" fill="#ddd6fe"/>
+
+    <!-- Valley dot -->
+    <circle cx="256" cy="358" r="7" fill="#c4b5fd" opacity="0.5"/>
   </g>
 
-  <!-- Arc gradient definition (can't be in defs inside clip, define here) -->
-  <defs>
-    <linearGradient id="arc-grad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"   stop-color="#a78bfa" stop-opacity="0"/>
-      <stop offset="40%"  stop-color="#a78bfa" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-
-  <!-- ── Icon border ── -->
+  <!-- Icon border -->
   <rect width="512" height="512" rx="114" fill="none"
-    stroke="#a78bfa" stroke-width="1.2" opacity="0.18"/>
-
-  <!--
-    ── The M mark ──
-    Redesigned: wider stance, shorter height, rounded inner valley,
-    thicker strokes (52px stems vs 40px before).
-    Left peak: (92, 138)   Right peak: (420, 138)
-    Valley lowest: (256, 308)  — shallower than before for better proportion
-    Bottom: y=382
-  -->
-
-  <!-- Purple bloom ghost behind M -->
-  <path filter="url(#m-bloom)" opacity="0.45"
-    d="M 92,382 L 92,138 L 256,290 L 420,138 L 420,382
-       L 368,382 L 368,228 L 256,346 L 144,228 L 144,382 Z"
-    fill="#b89dff"/>
-
-  <!-- White M with gradient fill -->
-  <path filter="url(#m-crisp)"
-    d="M 92,382 L 92,138 L 256,290 L 420,138 L 420,382
-       L 368,382 L 368,228 L 256,346 L 144,228 L 144,382 Z"
-    fill="url(#m-fill)"/>
-
-  <!-- ── Peak accent dots ── -->
-  <!-- Left peak glow -->
-  <circle filter="url(#dot-glow)" cx="92" cy="125" r="26" fill="#8b5cf6" opacity="0.9"/>
-  <circle cx="92" cy="125" r="15" fill="#ddd6fe"/>
-
-  <!-- Right peak glow -->
-  <circle filter="url(#dot-glow)" cx="420" cy="125" r="26" fill="#8b5cf6" opacity="0.9"/>
-  <circle cx="420" cy="125" r="15" fill="#ddd6fe"/>
-
-  <!-- Valley dot (very subtle) -->
-  <circle cx="256" cy="360" r="8" fill="#c4b5fd" opacity="0.4"/>
+    stroke="#a78bfa" stroke-width="1.5" opacity="0.2"/>
 
 </svg>

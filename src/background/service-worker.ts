@@ -15,7 +15,7 @@ function installYouTubeRefererRule() {
         priority: 1,
         condition: {
           initiatorDomains: [chrome.runtime.id],
-          requestDomains: ['www.youtube.com', 'www.youtube-nocookie.com'],
+          requestDomains: ['www.youtube-nocookie.com'],
           resourceTypes: [
             chrome.declarativeNetRequest.ResourceType.SUB_FRAME,
             chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,

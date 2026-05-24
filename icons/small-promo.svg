@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 280" width="440" height="280">
+  <defs>
+    <radialGradient id="bg" cx="28%" cy="25%" r="80%">
+      <stop offset="0%"   stop-color="#3b1280"/>
+      <stop offset="50%"  stop-color="#160636"/>
+      <stop offset="100%" stop-color="#05000f"/>
+    </radialGradient>
+    <radialGradient id="glow-l" cx="0%" cy="50%" r="60%">
+      <stop offset="0%"   stop-color="#7c3aed" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="spec" cx="85%" cy="8%" r="35%">
+      <stop offset="0%"   stop-color="#c4b5fd" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bloom" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="text-glow" x="-10%" y="-40%" width="120%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="m-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e9d8ff" stop-opacity="0.93"/>
+    </linearGradient>
+    <linearGradient id="title-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="440" height="280" fill="url(#bg)"/>
+  <rect width="440" height="280" fill="url(#glow-l)"/>
+  <rect width="440" height="280" fill="url(#spec)"/>
+
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="140" x2="440" y2="140" stroke="#a78bfa" stroke-width="0.4" opacity="0.06"/>
+  <line x1="220" y1="0" x2="220" y2="280" stroke="#a78bfa" stroke-width="0.4" opacity="0.06"/>
+
+  <!-- Left: M mark (scaled down, positioned left) -->
+  <!-- M at ~80px tall, centered around x=90, y=108 -->
+  <g transform="translate(44, 60) scale(0.28)">
+    <!-- bloom -->
+    <path filter="url(#bloom)" opacity="0.5"
+      d="M 92,382 L 92,138 L 256,290 L 420,138 L 420,382
+         L 368,382 L 368,228 L 256,346 L 144,228 L 144,382 Z"
+      fill="#b89dff"/>
+    <!-- M -->
+    <path d="M 92,382 L 92,138 L 256,290 L 420,138 L 420,382
+             L 368,382 L 368,228 L 256,346 L 144,228 L 144,382 Z"
+      fill="url(#m-fill)"/>
+    <!-- dots -->
+    <circle cx="92"  cy="125" r="18" fill="#8b5cf6" opacity="0.9"/>
+    <circle cx="92"  cy="125" r="10" fill="#ddd6fe"/>
+    <circle cx="420" cy="125" r="18" fill="#8b5cf6" opacity="0.9"/>
+    <circle cx="420" cy="125" r="10" fill="#ddd6fe"/>
+  </g>
+
+  <!-- Divider line -->
+  <line x1="165" y1="44" x2="165" y2="236" stroke="#a78bfa" stroke-width="0.8" opacity="0.2"/>
+
+  <!-- Right: Text content -->
+  <!-- MonkTab wordmark -->
+  <text x="188" y="92" font-family="system-ui,-apple-system,sans-serif"
+    font-size="34" font-weight="800" letter-spacing="-0.5"
+    fill="url(#title-grad)">MonkTab</text>
+
+  <text x="188" y="114" font-family="system-ui,-apple-system,sans-serif"
+    font-size="11.5" font-weight="400" letter-spacing="2.5"
+    fill="#a78bfa" text-transform="uppercase">DEVELOPER NEW TAB</text>
+
+  <!-- Separator -->
+  <rect x="188" y="126" width="220" height="1" fill="#a78bfa" opacity="0.25"/>
+
+  <!-- Feature pills -->
+  <g font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="white">
+
+    <!-- Row 1 -->
+    <g transform="translate(188, 148)">
+      <circle cx="5" cy="4.5" r="3" fill="#a78bfa"/>
+      <text x="14" dy="8" fill="#e2d9f3">Pomodoro + Focus Mode</text>
+    </g>
+    <g transform="translate(188, 166)">
+      <circle cx="5" cy="4.5" r="3" fill="#a78bfa"/>
+      <text x="14" dy="8" fill="#e2d9f3">Ambient Sounds · 20+ variants</text>
+    </g>
+    <g transform="translate(188, 184)">
+      <circle cx="5" cy="4.5" r="3" fill="#a78bfa"/>
+      <text x="14" dy="8" fill="#e2d9f3">Tasks with Priority &amp; Filters</text>
+    </g>
+    <g transform="translate(188, 202)">
+      <circle cx="5" cy="4.5" r="3" fill="#a78bfa"/>
+      <text x="14" dy="8" fill="#e2d9f3">Weather · World Clocks · Notes</text>
+    </g>
+    <g transform="translate(188, 220)">
+      <circle cx="5" cy="4.5" r="3" fill="#34d399"/>
+      <text x="14" dy="8" fill="#34d399" font-weight="500">Zero accounts · 100% private</text>
+    </g>
+  </g>
+
+  <!-- Bottom bar -->
+  <rect x="0" y="260" width="440" height="20" fill="#0a0018" opacity="0.5"/>
+  <text x="220" y="273" font-family="system-ui,-apple-system,sans-serif"
+    font-size="9.5" font-weight="500" letter-spacing="1.5"
+    fill="#6d4fc2" text-anchor="middle">DEVOPS-MONK · CHROME EXTENSION</text>
+</svg>
