@@ -660,29 +660,42 @@ const YT_VIDEOS = [
 
 function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
   const ytGrid = document.getElementById('yt-grid') as HTMLElement;
+  const playerView = document.getElementById('yt-player-view') as HTMLElement;
+  const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
+  const titleEl = document.getElementById('yt-player-title') as HTMLElement;
+  const openLink = document.getElementById('yt-open-link') as HTMLAnchorElement;
 
   YT_VIDEOS.forEach(v => {
-    const card = document.createElement('a');
+    const card = document.createElement('div');
     card.className = 'yt-card';
-    card.href = `https://www.youtube.com/watch?v=${v.id}`;
-    card.target = '_blank';
-    card.rel = 'noopener noreferrer';
-    card.title = `${v.title} — opens in YouTube`;
     card.innerHTML = `
       <div class="yt-thumb-wrap">
         <img class="yt-thumb" src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="${v.title}" loading="lazy" />
         <div class="yt-play-overlay">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         </div>
-        <span class="yt-ext-badge">↗</span>
       </div>
       <div class="yt-card-info">
         <span class="yt-card-title">${v.title}</span>
         <span class="yt-card-ch">${v.ch}</span>
       </div>
     `;
-    card.addEventListener('click', () => updateNowPlaying(v.title));
+    card.addEventListener('click', () => {
+      ytGrid.classList.add('hidden');
+      playerView.classList.remove('hidden');
+      titleEl.textContent = `${v.title} · ${v.ch}`;
+      openLink.href = `https://www.youtube.com/watch?v=${v.id}`;
+      iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+      updateNowPlaying(v.title);
+    });
     ytGrid.appendChild(card);
+  });
+
+  document.getElementById('btn-yt-back')?.addEventListener('click', () => {
+    playerView.classList.add('hidden');
+    ytGrid.classList.remove('hidden');
+    iframe.src = '';
+    updateNowPlaying(null);
   });
 }
 
