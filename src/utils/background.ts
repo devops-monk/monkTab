@@ -19,9 +19,9 @@ function todayIndex(): number {
   return (d.getFullYear() * 366 + d.getMonth() * 31 + d.getDate()) % FALLBACK_PHOTOS.length;
 }
 
-export async function getBackground(unsplashKey: string): Promise<{ url: string; thumb: string }> {
+export async function getBackground(unsplashKey: string, forceNext = false): Promise<{ url: string; thumb: string }> {
   const daily = await getDaily();
-  if (daily?.date === todayString() && daily.backgroundUrl) {
+  if (!forceNext && daily?.date === todayString() && daily.backgroundUrl) {
     return { url: daily.backgroundUrl, thumb: daily.backgroundThumb };
   }
 
@@ -33,15 +33,20 @@ export async function getBackground(unsplashKey: string): Promise<{ url: string;
       const data = await res.json() as {
         urls: { full: string; thumb: string };
       };
-      const url = data.urls.full;
-      const thumb = data.urls.thumb;
-      await saveDaily({ backgroundUrl: url, backgroundThumb: thumb });
-      return { url, thumb };
-    } catch { /* fall through to fallback */ }
+      await saveDaily({ backgroundUrl: data.urls.full, backgroundThumb: data.urls.thumb });
+      return { url: data.urls.full, thumb: data.urls.thumb };
+    } catch { /* fall through */ }
   }
 
-  // Fallback: deterministic daily Unsplash photo (no API key needed)
-  const id = FALLBACK_PHOTOS[todayIndex()];
+  // Pick next photo from the fallback pool
+  const currentIdx = daily?.backgroundUrl
+    ? FALLBACK_PHOTOS.findIndex((id) => daily.backgroundUrl.includes(id))
+    : -1;
+  const nextIdx = forceNext
+    ? (currentIdx + 1) % FALLBACK_PHOTOS.length
+    : todayIndex();
+
+  const id = FALLBACK_PHOTOS[nextIdx];
   const url = `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1920&q=80`;
   const thumb = `https://images.unsplash.com/${id}?auto=format&fit=crop&w=400&q=60`;
   await saveDaily({ backgroundUrl: url, backgroundThumb: thumb });

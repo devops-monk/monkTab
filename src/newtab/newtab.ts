@@ -7,7 +7,7 @@ import { fetchWeather } from '../utils/weather';
 import { getBackground } from '../utils/background';
 import { getQuote } from '../utils/quotes';
 import { fetchOpenPRs, timeAgo } from '../utils/github';
-import { SOUNDSCAPES } from '../utils/soundscapes';
+import { SOUNDSCAPES, playSoundscape, stopSoundscape, setSoundVolume } from '../utils/soundscapes';
 
 // ─── Clock ────────────────────────────────────────────────────────────────────
 
@@ -83,9 +83,11 @@ function renderWorldClocks(clocks: WorldClock[]) {
     bar.appendChild(card);
 
     const update = () => {
-      timeEl.textContent = new Date().toLocaleTimeString('en-GB', {
-        timeZone: timezone, hour: '2-digit', minute: '2-digit',
-      });
+      try {
+        timeEl.textContent = new Date().toLocaleTimeString('en-GB', {
+          timeZone: timezone, hour: '2-digit', minute: '2-digit',
+        });
+      } catch { timeEl.textContent = '--:--'; }
     };
     update();
     setInterval(update, 10000);
@@ -386,57 +388,52 @@ function initSoundscapes() {
   const panel = document.getElementById('sound-panel') as HTMLElement;
   const grid = document.getElementById('sound-grid') as HTMLElement;
   const volumeSlider = document.getElementById('sound-volume') as HTMLInputElement;
-
   let activeId: string | null = null;
-  let audio: HTMLAudioElement | null = null;
 
-  function setVolume(v: number) {
-    if (audio) audio.volume = v / 100;
-  }
-
-  function play(id: string) {
-    const sc = SOUNDSCAPES.find(s => s.id === id);
-    if (!sc) return;
-
-    if (audio) { audio.pause(); audio = null; }
-
-    audio = new Audio(sc.url);
-    audio.loop = true;
-    audio.volume = parseInt(volumeSlider.value, 10) / 100;
-    audio.play().catch(() => {});
-    activeId = id;
-
-    grid.querySelectorAll<HTMLButtonElement>('.sound-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset['id'] === id);
-    });
-  }
-
-  function stop() {
-    if (audio) { audio.pause(); audio = null; }
-    activeId = null;
-    grid.querySelectorAll('.sound-btn').forEach(btn => btn.classList.remove('active'));
-  }
-
-  // Build grid
   SOUNDSCAPES.forEach(sc => {
     const btn = document.createElement('button');
     btn.className = 'sound-btn';
     btn.dataset['id'] = sc.id;
-    btn.innerHTML = `<span class="sound-emoji">${sc.emoji}</span><span class="sound-label">${sc.label}</span>`;
+    btn.innerHTML = `<span class="sound-icon">${sc.svg}</span><span class="sound-label">${sc.label}</span>`;
     btn.addEventListener('click', () => {
-      if (activeId === sc.id) stop(); else play(sc.id);
+      if (activeId === sc.id) {
+        stopSoundscape();
+        activeId = null;
+        grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+        updateNowPlaying(null);
+      } else {
+        activeId = sc.id;
+        playSoundscape(sc.id, parseInt(volumeSlider.value, 10));
+        grid.querySelectorAll<HTMLButtonElement>('.sound-btn').forEach(b =>
+          b.classList.toggle('active', b.dataset['id'] === sc.id));
+        updateNowPlaying(sc.label);
+      }
     });
     grid.appendChild(btn);
   });
 
-  volumeSlider.addEventListener('input', () => setVolume(parseInt(volumeSlider.value, 10)));
+  function updateNowPlaying(label: string | null) {
+    const el = document.getElementById('sound-now-playing');
+    if (!el) return;
+    if (label) {
+      el.textContent = label;
+      el.parentElement?.classList.remove('hidden');
+    } else {
+      el.parentElement?.classList.add('hidden');
+    }
+  }
+
+  volumeSlider.addEventListener('input', () => setSoundVolume(parseInt(volumeSlider.value, 10)));
 
   document.getElementById('btn-sound-toggle')?.addEventListener('click', () => {
     panel.classList.toggle('hidden');
   });
   document.getElementById('btn-sound-close')?.addEventListener('click', () => {
     panel.classList.add('hidden');
-    stop();
+    stopSoundscape();
+    activeId = null;
+    grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+    updateNowPlaying(null);
   });
 }
 
@@ -640,6 +637,18 @@ function initSettingsPanel(settings: Settings) {
 
   const clonedClocks = settings.worldClocks.map(c => ({ ...c }));
   renderClocksConfig(clonedClocks);
+  // Preset dropdown
+  document.getElementById('tz-preset')?.addEventListener('change', (e) => {
+    const val = (e.target as HTMLSelectElement).value;
+    if (!val) return;
+    const [label, timezone] = val.split('|');
+    if (label && timezone) {
+      clonedClocks.push({ label, timezone });
+      renderClocksConfig(clonedClocks);
+    }
+    (e.target as HTMLSelectElement).value = '';
+  });
+
   document.getElementById('btn-add-clock')?.addEventListener('click', () => {
     clonedClocks.push({ label: '', timezone: '' });
     renderClocksConfig(clonedClocks);
@@ -727,6 +736,16 @@ async function init() {
   if (settings.showWorldClocks && settings.worldClocks.length > 0) {
     renderWorldClocks(settings.worldClocks);
   }
+
+  // Background cycle button
+  document.getElementById('btn-bg-cycle')?.addEventListener('click', async () => {
+    const { url, thumb } = await getBackground(settings.unsplashKey, true);
+    const bg = document.getElementById('bg') as HTMLDivElement;
+    bg.style.backgroundImage = `url(${thumb})`;
+    const img = new Image();
+    img.onload = () => { bg.style.backgroundImage = `url(${url})`; };
+    img.src = url;
+  });
 
   // Async non-blocking
   loadBackground(settings);

@@ -157,10 +157,19 @@
   <!-- Soundscapes panel -->
   <div id="sound-panel" class="sound-panel hidden">
     <div class="sound-header">
-      <span>🎵 Soundscapes</span>
+      <div class="sound-title-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        <span class="sound-title-text">Soundscapes</span>
+        <div class="sound-now-playing hidden">
+          <span class="sound-pulse"></span>
+          <span id="sound-now-playing"></span>
+        </div>
+      </div>
       <div class="sound-controls">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--text-dimmer)"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>
         <input id="sound-volume" type="range" min="0" max="100" value="50" title="Volume" />
-        <button id="btn-sound-close" class="icon-btn-sm">✕</button>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--text-dimmer)"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        <button id="btn-sound-close" class="icon-btn-sm" style="margin-left:4px">✕</button>
       </div>
     </div>
     <div id="sound-grid" class="sound-grid"></div>
@@ -265,7 +274,30 @@
 
       <div class="settings-section">World Clocks</div>
       <div id="clocks-config" class="clocks-config"></div>
-      <button id="btn-add-clock" class="add-row-btn">+ Add clock</button>
+      <select id="tz-preset" class="setting-row" style="margin-top:4px">
+        <option value="">— Quick add a city —</option>
+        <option value="London|Europe/London">London</option>
+        <option value="New York|America/New_York">New York</option>
+        <option value="Los Angeles|America/Los_Angeles">Los Angeles</option>
+        <option value="Chicago|America/Chicago">Chicago</option>
+        <option value="Toronto|America/Toronto">Toronto</option>
+        <option value="São Paulo|America/Sao_Paulo">São Paulo</option>
+        <option value="Paris|Europe/Paris">Paris</option>
+        <option value="Berlin|Europe/Berlin">Berlin</option>
+        <option value="Amsterdam|Europe/Amsterdam">Amsterdam</option>
+        <option value="Dubai|Asia/Dubai">Dubai</option>
+        <option value="Mumbai|Asia/Kolkata">Mumbai / IST</option>
+        <option value="Singapore|Asia/Singapore">Singapore</option>
+        <option value="Tokyo|Asia/Tokyo">Tokyo</option>
+        <option value="Sydney|Australia/Sydney">Sydney</option>
+        <option value="Auckland|Pacific/Auckland">Auckland</option>
+        <option value="Beijing|Asia/Shanghai">Beijing / Shanghai</option>
+        <option value="Seoul|Asia/Seoul">Seoul</option>
+        <option value="Nairobi|Africa/Nairobi">Nairobi</option>
+        <option value="Cairo|Africa/Cairo">Cairo</option>
+        <option value="Lagos|Africa/Lagos">Lagos</option>
+      </select>
+      <button id="btn-add-clock" class="add-row-btn">+ Add custom clock</button>
 
       <div class="settings-section">AI</div>
       <label class="setting-row">
@@ -280,6 +312,12 @@
     </div>
     <button id="btn-settings-save" class="save-btn">Save Settings</button>
   </aside>
+
+  <!-- Background cycle button -->
+  <button id="btn-bg-cycle" class="bg-cycle-btn" title="Next background">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
+    New photo
+  </button>
 
   <script type="module" src="./newtab.ts"></script>
 </body>
