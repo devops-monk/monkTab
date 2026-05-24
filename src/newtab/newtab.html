@@ -16,8 +16,12 @@
   <header class="topbar">
     <div class="topbar-left">
       <button class="icon-btn" id="btn-links-toggle" title="Quick Links">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         Links
+      </button>
+      <button class="icon-btn" id="btn-notes-toggle" title="Notes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Notes
       </button>
     </div>
 
@@ -32,16 +36,27 @@
     </form>
 
     <div class="topbar-right">
+      <!-- Ask AI button -->
+      <button class="icon-btn" id="btn-sound-toggle" title="Soundscapes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-ai-toggle" title="Ask AI">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 8v4l3 3"/><circle cx="19" cy="5" r="3"/></svg>
+        Ask AI
+      </button>
       <div id="weather-widget" class="weather hidden">
         <span id="weather-icon">🌤️</span>
         <span id="weather-temp">--°</span>
         <span id="weather-city"></span>
       </div>
       <button class="icon-btn" id="btn-settings" title="Settings">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
   </header>
+
+  <!-- World Clocks bar -->
+  <div id="world-clocks-bar" class="world-clocks-bar hidden"></div>
 
   <!-- Main -->
   <main class="main">
@@ -57,11 +72,20 @@
       <p id="quote-text" class="quote-text"></p>
       <p id="quote-author" class="quote-author"></p>
     </div>
+
+    <!-- Countdowns (inline, below quote) -->
+    <div id="countdowns-wrap" class="countdowns-wrap hidden">
+      <div id="countdowns-list" class="countdowns-list"></div>
+      <form id="countdown-form" class="countdown-form">
+        <input id="cd-label" type="text" placeholder="Event name…" maxlength="30" />
+        <input id="cd-date" type="date" />
+        <button type="submit">+</button>
+      </form>
+    </div>
   </main>
 
   <!-- Bottom panels -->
-  <div class="bottom-panels">
-
+  <div class="bottom-panels-right">
     <!-- Pomodoro -->
     <div id="pomodoro-panel" class="panel pomodoro-panel hidden">
       <div class="pomodoro-tabs">
@@ -80,7 +104,9 @@
     <div id="todos-panel" class="panel todos-panel">
       <div class="panel-header">
         <span>Tasks</span>
-        <button id="btn-pomo-toggle" class="icon-btn-sm" title="Pomodoro Timer">🍅</button>
+        <div style="display:flex;gap:6px">
+          <button id="btn-pomo-toggle" class="icon-btn-sm" title="Pomodoro Timer">🍅</button>
+        </div>
       </div>
       <ul id="todo-list" class="todo-list"></ul>
       <form id="todo-form" class="todo-form">
@@ -88,14 +114,27 @@
         <button type="submit">+</button>
       </form>
     </div>
-
   </div>
 
-  <!-- Quick links panel (slide-in) -->
+  <!-- GitHub Activity panel (bottom left) -->
+  <div id="github-panel" class="panel github-panel hidden">
+    <div class="panel-header">
+      <span>🔀 Open Pull Requests</span>
+      <button class="icon-btn-sm" id="btn-github-refresh" title="Refresh">↻</button>
+    </div>
+    <ul id="github-list" class="github-list"></ul>
+    <p id="github-empty" class="panel-empty hidden">No open PRs 🎉</p>
+    <p id="github-error" class="panel-error hidden"></p>
+  </div>
+
+  <!-- Quick links panel (slide from left) -->
   <aside id="links-panel" class="links-panel hidden">
     <div class="panel-header">
       <span>Quick Links</span>
-      <button id="btn-links-close" class="icon-btn-sm">✕</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="btn-bookmarks-import" class="icon-btn-sm" title="Import from bookmarks">📚 Import</button>
+        <button id="btn-links-close" class="icon-btn-sm">✕</button>
+      </div>
     </div>
     <ul id="links-list" class="links-list"></ul>
     <form id="link-form" class="link-form">
@@ -105,13 +144,60 @@
     </form>
   </aside>
 
-  <!-- Settings panel -->
+  <!-- Notes panel (slide from left, layered) -->
+  <aside id="notes-panel" class="notes-panel hidden">
+    <div class="panel-header">
+      <span>Notes</span>
+      <button id="btn-notes-close" class="icon-btn-sm">✕</button>
+    </div>
+    <textarea id="notes-textarea" class="notes-textarea" placeholder="Start writing…" spellcheck="true"></textarea>
+    <p class="notes-hint">Auto-saved locally</p>
+  </aside>
+
+  <!-- Soundscapes panel -->
+  <div id="sound-panel" class="sound-panel hidden">
+    <div class="sound-header">
+      <span>🎵 Soundscapes</span>
+      <div class="sound-controls">
+        <input id="sound-volume" type="range" min="0" max="100" value="50" title="Volume" />
+        <button id="btn-sound-close" class="icon-btn-sm">✕</button>
+      </div>
+    </div>
+    <div id="sound-grid" class="sound-grid"></div>
+  </div>
+
+  <!-- Ask AI modal -->
+  <div id="ai-modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Ask AI</span>
+        <button id="btn-ai-close" class="icon-btn-sm">✕</button>
+      </div>
+      <textarea id="ai-prompt" class="ai-textarea" placeholder="What do you want to ask?" rows="4"></textarea>
+      <div class="ai-providers">
+        <button class="ai-provider-btn active" data-provider="claude">
+          <span>🤖</span> Claude
+        </button>
+        <button class="ai-provider-btn" data-provider="chatgpt">
+          <span>✨</span> ChatGPT
+        </button>
+        <button class="ai-provider-btn" data-provider="gemini">
+          <span>♊</span> Gemini
+        </button>
+      </div>
+      <button id="btn-ai-submit" class="save-btn">Ask →</button>
+    </div>
+  </div>
+
+  <!-- Settings panel (slide from right) -->
   <aside id="settings-panel" class="settings-panel hidden">
     <div class="panel-header">
       <span>Settings</span>
       <button id="btn-settings-close" class="icon-btn-sm">✕</button>
     </div>
     <div class="settings-body">
+
+      <div class="settings-section">Profile</div>
       <label class="setting-row">
         Your name
         <input id="set-name" type="text" placeholder="Abhay" maxlength="30" />
@@ -132,17 +218,65 @@
           <option value="light">Light</option>
         </select>
       </label>
+
+      <div class="settings-section">Widgets</div>
       <div class="setting-toggles">
-        <label class="toggle-row"><input type="checkbox" id="set-weather" /> Show weather</label>
-        <label class="toggle-row"><input type="checkbox" id="set-quote" /> Show quote</label>
-        <label class="toggle-row"><input type="checkbox" id="set-todos" /> Show tasks</label>
-        <label class="toggle-row"><input type="checkbox" id="set-links" /> Show quick links</label>
-        <label class="toggle-row"><input type="checkbox" id="set-pomodoro" /> Show Pomodoro</label>
+        <label class="toggle-row"><input type="checkbox" id="set-weather" /> Weather</label>
+        <label class="toggle-row"><input type="checkbox" id="set-quote" /> Daily quote</label>
+        <label class="toggle-row"><input type="checkbox" id="set-todos" /> Tasks</label>
+        <label class="toggle-row"><input type="checkbox" id="set-links" /> Quick links</label>
+        <label class="toggle-row"><input type="checkbox" id="set-pomodoro" /> Pomodoro timer</label>
+        <label class="toggle-row"><input type="checkbox" id="set-notes" /> Notes</label>
+        <label class="toggle-row"><input type="checkbox" id="set-clocks" /> World clocks</label>
+        <label class="toggle-row"><input type="checkbox" id="set-countdowns" /> Countdowns</label>
+        <label class="toggle-row"><input type="checkbox" id="set-github" /> GitHub activity</label>
+        <label class="toggle-row"><input type="checkbox" id="set-ai" /> Ask AI</label>
+      </div>
+
+      <div class="settings-section">Background</div>
+      <div class="setting-row">
+        <span>Background mode</span>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <label class="toggle-row"><input type="radio" name="bg-mode" id="bg-daily" value="daily" /> Daily photo</label>
+          <label class="toggle-row"><input type="radio" name="bg-mode" id="bg-custom" value="custom" /> My photos</label>
+        </div>
+      </div>
+      <div class="vision-board">
+        <div id="custom-bg-grid" class="custom-bg-grid"></div>
+        <label class="upload-btn">
+          + Upload photo
+          <input id="bg-upload" type="file" accept="image/*" hidden />
+        </label>
       </div>
       <label class="setting-row">
-        Unsplash API key <small>(optional, for fresh daily photos)</small>
+        Unsplash API key <small>(optional)</small>
         <input id="set-unsplash" type="text" placeholder="Paste key…" />
       </label>
+
+      <div class="settings-section">GitHub</div>
+      <label class="setting-row">
+        GitHub username
+        <input id="set-gh-user" type="text" placeholder="devops-monk" />
+      </label>
+      <label class="setting-row">
+        GitHub token <small>(for private repos)</small>
+        <input id="set-gh-token" type="password" placeholder="ghp_…" />
+      </label>
+
+      <div class="settings-section">World Clocks</div>
+      <div id="clocks-config" class="clocks-config"></div>
+      <button id="btn-add-clock" class="add-row-btn">+ Add clock</button>
+
+      <div class="settings-section">AI</div>
+      <label class="setting-row">
+        Default AI provider
+        <select id="set-ai-provider">
+          <option value="claude">Claude (Anthropic)</option>
+          <option value="chatgpt">ChatGPT (OpenAI)</option>
+          <option value="gemini">Gemini (Google)</option>
+        </select>
+      </label>
+
     </div>
     <button id="btn-settings-save" class="save-btn">Save Settings</button>
   </aside>

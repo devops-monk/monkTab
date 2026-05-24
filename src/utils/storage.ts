@@ -6,8 +6,20 @@ export interface Settings {
   showTodos: boolean;
   showLinks: boolean;
   showPomodoro: boolean;
+  showNotes: boolean;
+  showWorldClocks: boolean;
+  showCountdowns: boolean;
+  showGithub: boolean;
+  showAi: boolean;
   theme: 'auto' | 'light' | 'dark';
   unsplashKey: string;
+  githubToken: string;
+  githubUsername: string;
+  aiProvider: 'claude' | 'chatgpt' | 'gemini';
+  worldClocks: WorldClock[];
+  customBackgrounds: string[]; // data URLs, max 6
+  activeBackground: 'daily' | 'custom';
+  activeCustomBg: number; // index into customBackgrounds
 }
 
 export interface Todo {
@@ -22,8 +34,19 @@ export interface QuickLink {
   url: string;
 }
 
+export interface Countdown {
+  id: string;
+  label: string;
+  date: string; // ISO date string YYYY-MM-DD
+}
+
+export interface WorldClock {
+  label: string;
+  timezone: string;
+}
+
 export interface DailyState {
-  date: string;         // YYYY-MM-DD
+  date: string;
   focus: string;
   backgroundUrl: string;
   backgroundThumb: string;
@@ -47,8 +70,24 @@ const DEFAULTS: Settings = {
   showTodos: true,
   showLinks: true,
   showPomodoro: false,
+  showNotes: false,
+  showWorldClocks: false,
+  showCountdowns: false,
+  showGithub: false,
+  showAi: true,
   theme: 'auto',
   unsplashKey: '',
+  githubToken: '',
+  githubUsername: '',
+  aiProvider: 'claude',
+  worldClocks: [
+    { label: 'London', timezone: 'Europe/London' },
+    { label: 'New York', timezone: 'America/New_York' },
+    { label: 'Tokyo', timezone: 'Asia/Tokyo' },
+  ],
+  customBackgrounds: [],
+  activeBackground: 'daily',
+  activeCustomBg: 0,
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -96,6 +135,24 @@ export async function getWeatherCache(): Promise<WeatherCache | null> {
 
 export async function saveWeatherCache(w: WeatherCache): Promise<void> {
   await chrome.storage.local.set({ mt_weather: w });
+}
+
+export async function getNotes(): Promise<string> {
+  const result = await chrome.storage.local.get('mt_notes');
+  return (result['mt_notes'] as string) ?? '';
+}
+
+export async function saveNotes(text: string): Promise<void> {
+  await chrome.storage.local.set({ mt_notes: text });
+}
+
+export async function getCountdowns(): Promise<Countdown[]> {
+  const result = await chrome.storage.local.get('mt_countdowns');
+  return (result['mt_countdowns'] as Countdown[]) ?? [];
+}
+
+export async function saveCountdowns(items: Countdown[]): Promise<void> {
+  await chrome.storage.local.set({ mt_countdowns: items });
 }
 
 function defaultLinks(): QuickLink[] {
