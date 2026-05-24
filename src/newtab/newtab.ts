@@ -644,18 +644,26 @@ function initSoundscapes() {
 
 // All videos verified embeddable (youtube-nocookie.com)
 const YT_VIDEOS = [
-  { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio',       ch: 'Lofi Girl' },
-  { id: '4xDzrJKXOOY', title: 'Synthwave Radio',           ch: 'Lofi Girl' },
-  { id: 'Na0w3Mz46GA', title: 'Lofi Chill Beats',         ch: 'Lofi Girl' },
-  { id: 'lCOF9LVlRks', title: 'Dark Academia Playlist',   ch: 'Lofi Girl' },
-  { id: 'DWcJFNfaw9c', title: 'Brown Noise · 8h',         ch: 'Relaxing White Noise' },
+  // Lofi / Chillhop — regular uploaded videos (not live streams)
+  { id: 'CFGLoQIhmow', title: 'Lofi Hip Hop Mix',         ch: 'Lofi Girl' },
+  { id: 'n61ULEU7CO0', title: 'Best of Lofi 2021',        ch: 'Lofi Girl' },
+  { id: 'HFQibg2OJkU', title: 'Chillhop Spring 2025',    ch: 'Chillhop Music' },
+  { id: '5yx6BWlEVcY', title: 'Chillhop Radio Mix',       ch: 'Chillhop Music' },
+  { id: 'D_uLM5i0Z4c', title: 'Endless Sunday',           ch: 'Chillhop Music' },
+  { id: 'zUD8p1Nt7GM', title: 'Morning Jazz Lofi',        ch: 'The Jazz Hop Café' },
+  // Piano
+  { id: 'E7EOjkGVmyo', title: 'Relaxing Piano · 1h',      ch: "Jacob's Piano" },
+  { id: 'Ne2TcmhGrLU', title: 'Beautiful Soundtracks',    ch: "Jacob's Piano" },
+  { id: 'sCwtp2lmUEU', title: 'Felt Piano · 30min',       ch: "Jacob's Piano" },
+  { id: '1ZYbU82GVz4', title: 'Sleep & Relax Music',      ch: 'Soothing Relaxation' },
+  // Ambient / Focus
   { id: 'lTRiuFIWV54', title: 'Deep Focus Music',         ch: 'Greenred Productions' },
-  { id: 'WPni755-Krg', title: 'Classical Focus',          ch: 'Lofi Girl' },
-  { id: '36YnV9STBqc', title: 'Piano for Studying',       ch: 'Soothing Relaxation' },
+  { id: 'wzAz4QB_NKI', title: 'Study Ambient Music',      ch: 'Greenred Productions' },
+  { id: '4GnVDPD01as', title: 'Ambient Study · 4h',       ch: 'Focus Music' },
+  // Nature
+  { id: 'eKFTSSKCzWA', title: 'Nature Sounds · 8h',       ch: 'Nature Sounds' },
   { id: 'sjkrrmBnpGE', title: 'Jazz & Bossa Nova',        ch: 'Lofi Jazz' },
-  { id: 'rUxyKA_-grg', title: 'Peaceful Piano',           ch: 'Soothing Relaxation' },
-  { id: '2gliGzb2_1I', title: 'Coffee Shop Ambience',    ch: 'Ambient Sounds' },
-  { id: 'qYnA9wWFHLI', title: 'Forest Rain · 3h',        ch: 'Nature Soundscapes' },
+  { id: '2gliGzb2_1I', title: 'Coffee Shop Ambience',     ch: 'Ambient Sounds' },
 ];
 
 function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
@@ -1057,7 +1065,7 @@ function initFocusMode() {
     });
   }
 
-  // Build the FM sound grid
+  // Build the FM ambient sound grid
   SOUNDSCAPES.forEach(sc => {
     const btn = document.createElement('button');
     btn.className = 'sound-btn fm-sc-btn';
@@ -1078,6 +1086,69 @@ function initFocusMode() {
       fmShowVariants(sc);
     });
     fmGrid.appendChild(btn);
+  });
+
+  // ── FM YouTube tab ──────────────────────────────────────────────────────────
+  const fmAmbientSection = document.getElementById('fm-ambient-section') as HTMLElement;
+  const fmYtSection = document.getElementById('fm-yt-section') as HTMLElement;
+  const fmYtGrid = document.getElementById('fm-yt-grid') as HTMLElement;
+  const fmYtPlayer = document.getElementById('fm-yt-player') as HTMLElement;
+  const fmYtIframe = document.getElementById('fm-yt-iframe') as HTMLIFrameElement;
+  const fmYtTitle = document.getElementById('fm-yt-title') as HTMLElement;
+  const fmYtOpen = document.getElementById('fm-yt-open') as HTMLAnchorElement;
+
+  picker.querySelectorAll<HTMLButtonElement>('.fm-sp-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      picker.querySelectorAll('.fm-sp-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const isYt = tab.dataset['fptab'] === 'youtube';
+      fmAmbientSection.classList.toggle('hidden', isYt);
+      fmYtSection.classList.toggle('hidden', !isYt);
+      if (isYt) {
+        // Stop ambient when switching to YouTube
+        stopSoundscape(); fmActiveCat = null; fmActiveVariant = null;
+        fmGrid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+        fmVariantBar.classList.add('hidden');
+      } else {
+        // Stop YouTube when switching back
+        fmYtIframe.src = '';
+        fmYtPlayer.classList.add('hidden');
+        fmYtGrid.classList.remove('hidden');
+        fmSoundInfo = null; updateFmSoundChip();
+      }
+    });
+  });
+
+  // Build FM YouTube grid
+  YT_VIDEOS.forEach(v => {
+    const card = document.createElement('div');
+    card.className = 'yt-card';
+    card.innerHTML = `
+      <div class="yt-thumb-wrap">
+        <img class="yt-thumb" src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="${v.title}" loading="lazy" />
+        <div class="yt-play-overlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+      </div>
+      <div class="yt-card-info">
+        <span class="yt-card-title">${v.title}</span>
+        <span class="yt-card-ch">${v.ch}</span>
+      </div>`;
+    card.addEventListener('click', () => {
+      fmYtGrid.classList.add('hidden');
+      fmYtPlayer.classList.remove('hidden');
+      fmYtTitle.textContent = `${v.title} · ${v.ch}`;
+      fmYtOpen.href = `https://www.youtube.com/watch?v=${v.id}`;
+      fmYtIframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+      fmSoundInfo = { label: v.title, variantId: `yt-${v.id}` };
+      updateFmSoundChip();
+    });
+    fmYtGrid.appendChild(card);
+  });
+
+  document.getElementById('fm-yt-back')?.addEventListener('click', () => {
+    fmYtPlayer.classList.add('hidden');
+    fmYtGrid.classList.remove('hidden');
+    fmYtIframe.src = '';
+    fmSoundInfo = null; updateFmSoundChip();
   });
 
   // Focus mode task form

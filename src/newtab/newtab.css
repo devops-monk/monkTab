@@ -717,13 +717,20 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 }
 .fm-sp-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
-  font-size: 11px; font-weight: 700; letter-spacing: 1px;
-  text-transform: uppercase; color: rgba(255,255,255,0.4);
+  margin-bottom: 12px; gap: 8px;
 }
+.fm-sp-tabs { display: flex; gap: 4px; }
+.fm-sp-tab {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px; padding: 4px 12px; font-size: 11px; font-weight: 600;
+  color: rgba(255,255,255,0.45); cursor: pointer; transition: all var(--transition);
+}
+.fm-sp-tab.active { background: rgba(167,139,250,0.2); border-color: rgba(167,139,250,0.4); color: #fff; }
+.fm-sp-tab:hover:not(.active) { color: rgba(255,255,255,0.75); border-color: rgba(255,255,255,0.2); }
 .fm-sp-vol { display: flex; align-items: center; gap: 6px; }
 .fm-sp-vol input[type="range"] {
-  width: 80px; accent-color: var(--accent); cursor: pointer;
+  width: 70px; accent-color: var(--accent); cursor: pointer;
 }
 .fm-sound-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
@@ -733,6 +740,14 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px;
   animation: sv-in 0.18s ease;
 }
+.fm-yt-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+  max-height: 300px; overflow-y: auto;
+}
+.fm-yt-player-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.fm-yt-player .yt-iframe-wrap { border-radius: 10px; }
 
 /* Main layout */
 .fm-main {

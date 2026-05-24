@@ -710,15 +710,49 @@
         <!-- Mini sound picker panel -->
         <div id="fm-sound-picker" class="fm-sound-picker hidden">
           <div class="fm-sp-header">
-            <span>Ambient Sounds</span>
+            <!-- Tabs -->
+            <div class="fm-sp-tabs">
+              <button class="fm-sp-tab active" data-fptab="ambient">Ambient</button>
+              <button class="fm-sp-tab" data-fptab="youtube">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6a3 3 0 0 0-2.1 2.1C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+                YouTube
+              </button>
+            </div>
             <div class="fm-sp-vol">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>
               <input id="fm-volume" type="range" min="0" max="100" value="50" />
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
             </div>
           </div>
-          <div id="fm-sound-grid" class="fm-sound-grid"></div>
-          <div id="fm-variant-bar" class="fm-variant-bar hidden"></div>
+
+          <!-- Ambient section -->
+          <div id="fm-ambient-section">
+            <div id="fm-sound-grid" class="fm-sound-grid"></div>
+            <div id="fm-variant-bar" class="fm-variant-bar hidden"></div>
+          </div>
+
+          <!-- YouTube section -->
+          <div id="fm-yt-section" class="hidden">
+            <div id="fm-yt-grid" class="fm-yt-grid"></div>
+            <div id="fm-yt-player" class="fm-yt-player hidden">
+              <div class="fm-yt-player-header">
+                <button id="fm-yt-back" class="yt-back-btn">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back
+                </button>
+                <span id="fm-yt-title" class="yt-player-title"></span>
+                <a id="fm-yt-open" class="yt-open-link" target="_blank" rel="noopener">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+              </div>
+              <div class="yt-iframe-wrap">
+                <iframe id="fm-yt-iframe" class="yt-iframe" frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allowfullscreen></iframe>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
