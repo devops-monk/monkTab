@@ -35,12 +35,16 @@ export async function fetchWeather(): Promise<WeatherCache | null> {
         try {
           const { latitude: lat, longitude: lon } = pos.coords;
 
-          // Reverse geocode city name
+          // Reverse geocode city name via Nominatim
           const geoRes = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&count=1`
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+            { headers: { 'Accept-Language': 'en' } }
           );
-          const geoData = await geoRes.json() as { results?: { name: string }[] };
-          const city = geoData.results?.[0]?.name ?? 'Your location';
+          const geoData = await geoRes.json() as {
+            address?: { city?: string; town?: string; village?: string; county?: string; country?: string };
+          };
+          const a = geoData.address ?? {};
+          const city = a.city ?? a.town ?? a.village ?? a.county ?? 'Your location';
 
           // Weather
           const wxRes = await fetch(
