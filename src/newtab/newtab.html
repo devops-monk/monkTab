@@ -177,19 +177,47 @@
 
     <!-- Todos -->
     <div id="todos-panel" class="panel todos-panel">
-      <div class="panel-header">
-        <span>Tasks</span>
-        <div style="display:flex;gap:6px">
+      <!-- Header -->
+      <div class="todo-header">
+        <div class="todo-header-left">
+          <span class="todo-header-title">Tasks</span>
+          <span id="todo-count" class="todo-count"></span>
+        </div>
+        <div class="todo-header-right">
+          <button id="btn-clear-done" class="todo-action-btn hidden" title="Clear completed tasks">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Clear done
+          </button>
           <button id="btn-pomo-toggle" class="icon-btn-sm" title="Pomodoro Timer">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><line x1="12" y1="6" x2="12" y2="3"/><path d="M8 3h8"/><line x1="12" y1="13" x2="14" y2="11"/></svg>
-        </button>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><line x1="12" y1="6" x2="12" y2="3"/><path d="M8 3h8"/><line x1="12" y1="13" x2="14" y2="11"/></svg>
+          </button>
         </div>
       </div>
+
+      <!-- Filter tabs -->
+      <div class="todo-filters">
+        <button class="todo-filter active" data-filter="active">Active</button>
+        <button class="todo-filter" data-filter="all">All</button>
+        <button class="todo-filter" data-filter="done">Done</button>
+      </div>
+
+      <!-- Task list -->
       <ul id="todo-list" class="todo-list"></ul>
-      <form id="todo-form" class="todo-form">
-        <input id="todo-input" type="text" placeholder="Add a task…" maxlength="100" />
-        <button type="submit">+</button>
-      </form>
+
+      <!-- Add form with priority selector -->
+      <div class="todo-add-wrap">
+        <div class="todo-priority-pick">
+          <button type="button" id="todo-priority-btn" class="todo-pri-btn" data-pri="none" title="Priority">
+            <span class="todo-pri-dot" id="todo-pri-dot"></span>
+          </button>
+        </div>
+        <form id="todo-form" class="todo-form">
+          <input id="todo-input" type="text" placeholder="Add a task…" maxlength="120" />
+          <button type="submit">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 

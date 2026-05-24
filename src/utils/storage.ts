@@ -26,6 +26,7 @@ export interface Todo {
   id: string;
   text: string;
   done: boolean;
+  priority?: 'high' | 'medium' | 'none';
 }
 
 export interface QuickLink {

@@ -146,35 +146,89 @@ async function initFocus() {
 // ─── Todos ────────────────────────────────────────────────────────────────────
 
 let todos: Todo[] = [];
+let todoFilter: 'active' | 'all' | 'done' = 'active';
+
+function filteredTodos() {
+  if (todoFilter === 'active') return todos.filter(t => !t.done);
+  if (todoFilter === 'done')   return todos.filter(t => t.done);
+  return todos;
+}
 
 function renderTodos() {
   const list = document.getElementById('todo-list') as HTMLUListElement;
   list.innerHTML = '';
-  if (todos.length === 0) {
-    list.innerHTML = '<li class="todo-empty">No tasks yet — add one below</li>';
+
+  // Count badge
+  const activeCount = todos.filter(t => !t.done).length;
+  const countEl = document.getElementById('todo-count');
+  if (countEl) countEl.textContent = activeCount > 0 ? String(activeCount) : '';
+
+  // Clear-done button visibility
+  const clearBtn = document.getElementById('btn-clear-done') as HTMLElement;
+  clearBtn?.classList.toggle('hidden', !todos.some(t => t.done));
+
+  const visible = filteredTodos();
+  if (visible.length === 0) {
+    const emptyMsgs: Record<string, string> = {
+      active: 'All clear! Add a task below',
+      done:   'No completed tasks yet',
+      all:    'No tasks yet — add one below',
+    };
+    list.innerHTML = `<li class="todo-empty">${emptyMsgs[todoFilter]}</li>`;
     return;
   }
-  todos.forEach((todo) => {
-    const li = document.createElement('li');
-    li.className = `todo-item${todo.done ? ' done' : ''}`;
 
+  visible.forEach((todo) => {
+    const li = document.createElement('li');
+    const pri = todo.priority ?? 'none';
+    li.className = `todo-item${todo.done ? ' done' : ''}${pri !== 'none' ? ` pri-${pri}` : ''}`;
+
+    // Checkbox
     const cb = document.createElement('input');
     cb.type = 'checkbox'; cb.className = 'todo-cb'; cb.checked = todo.done;
     cb.addEventListener('change', () => {
       todo.done = cb.checked;
       saveTodos(todos);
-      li.classList.toggle('done', todo.done);
-      updatePomoTask();
+      renderTodos(); renderFmTodos(); updatePomoTask();
     });
 
+    // Text + priority badge
+    const textWrap = document.createElement('div');
+    textWrap.className = 'todo-text-wrap';
     const span = document.createElement('span');
     span.textContent = todo.text;
+    const priBadge = document.createElement('span');
+    priBadge.className = 'todo-pri-badge';
+    priBadge.textContent = pri === 'high' ? 'High priority' : pri === 'medium' ? 'Medium' : '';
+    textWrap.append(span, priBadge);
+
+    // Actions: focus + delete
+    const actions = document.createElement('div');
+    actions.className = 'todo-item-actions';
+
+    if (!todo.done) {
+      const focusBtn = document.createElement('button');
+      focusBtn.className = 'focus-task-btn';
+      focusBtn.title = 'Start focus session on this task';
+      focusBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
+      focusBtn.addEventListener('click', () => {
+        document.getElementById('pomodoro-panel')?.classList.add('hidden');
+        enterFocusMode();
+        if (fmTaskLabelEl) fmTaskLabelEl.textContent = todo.text;
+      });
+      actions.appendChild(focusBtn);
+    }
 
     const del = document.createElement('button');
-    del.className = 'del-btn'; del.textContent = '✕';
-    del.addEventListener('click', () => { todos = todos.filter(t => t.id !== todo.id); saveTodos(todos); renderTodos(); });
+    del.className = 'del-btn'; del.title = 'Delete';
+    del.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    del.addEventListener('click', () => {
+      todos = todos.filter(t => t.id !== todo.id);
+      saveTodos(todos); renderTodos(); renderFmTodos(); updatePomoTask();
+    });
+    actions.appendChild(del);
 
-    li.append(cb, span, del);
+    li.append(cb, textWrap, actions);
     list.appendChild(li);
   });
 }
@@ -182,14 +236,44 @@ function renderTodos() {
 async function initTodos() {
   todos = await getTodos();
   renderTodos();
+
+  // Filter tabs
+  document.querySelectorAll<HTMLButtonElement>('.todo-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      todoFilter = btn.dataset['filter'] as typeof todoFilter;
+      document.querySelectorAll('.todo-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTodos();
+    });
+  });
+
+  // Clear done
+  document.getElementById('btn-clear-done')?.addEventListener('click', () => {
+    todos = todos.filter(t => !t.done);
+    saveTodos(todos); renderTodos(); renderFmTodos(); updatePomoTask();
+  });
+
+  // Priority toggle button
+  const priBtn = document.getElementById('todo-priority-btn') as HTMLButtonElement;
+  const PRIS: Array<'none' | 'medium' | 'high'> = ['none', 'medium', 'high'];
+  let priIdx = 0;
+  priBtn?.addEventListener('click', () => {
+    priIdx = (priIdx + 1) % PRIS.length;
+    priBtn.dataset['pri'] = PRIS[priIdx];
+  });
+
+  // Add task form
   const form = document.getElementById('todo-form') as HTMLFormElement;
   const input = document.getElementById('todo-input') as HTMLInputElement;
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    todos.push({ id: Date.now().toString(), text, done: false });
-    saveTodos(todos); renderTodos(); input.value = ''; updatePomoTask();
+    const priority = (priBtn?.dataset['pri'] ?? 'none') as Todo['priority'];
+    todos.push({ id: Date.now().toString(), text, done: false, priority });
+    // Reset priority
+    priIdx = 0; if (priBtn) priBtn.dataset['pri'] = 'none';
+    saveTodos(todos); renderTodos(); renderFmTodos(); input.value = ''; updatePomoTask();
   });
 }
 
