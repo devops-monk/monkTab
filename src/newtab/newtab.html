@@ -145,6 +145,10 @@
           <button id="pomo-start" class="pomo-btn">Start</button>
           <button id="pomo-reset" class="pomo-btn pomo-btn-ghost">Reset</button>
         </div>
+        <button id="btn-enter-focus" class="pomo-focus-btn" title="Enter full-screen focus mode">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          Focus Mode
+        </button>
       </div>
 
       <!-- Stats view -->
@@ -176,7 +180,9 @@
       <div class="panel-header">
         <span>Tasks</span>
         <div style="display:flex;gap:6px">
-          <button id="btn-pomo-toggle" class="icon-btn-sm" title="Pomodoro Timer">🍅</button>
+          <button id="btn-pomo-toggle" class="icon-btn-sm" title="Pomodoro Timer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><line x1="12" y1="6" x2="12" y2="3"/><path d="M8 3h8"/><line x1="12" y1="13" x2="14" y2="11"/></svg>
+        </button>
         </div>
       </div>
       <ul id="todo-list" class="todo-list"></ul>
@@ -272,6 +278,7 @@
         <div class="yt-iframe-wrap">
           <iframe id="yt-iframe" class="yt-iframe" frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            referrerpolicy="strict-origin-when-cross-origin"
             allowfullscreen></iframe>
         </div>
         <div id="yt-fallback" class="yt-fallback hidden">
@@ -652,6 +659,83 @@
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
     New photo
   </button>
+
+  <!-- ── Focus Mode Overlay ─────────────────────────────────────────────── -->
+  <div id="focus-mode" class="focus-mode hidden">
+
+    <!-- Top bar -->
+    <div class="fm-topbar">
+      <!-- Sound chip -->
+      <div id="fm-sound-chip" class="fm-sound-chip">
+        <span id="fm-sound-icon" class="fm-sound-ico"></span>
+        <span id="fm-sound-label" class="fm-sound-lbl">No sound</span>
+        <button id="fm-sound-toggle" class="fm-sound-stop" title="Stop sound">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+      </div>
+
+      <span class="fm-title">Focusing</span>
+
+      <button id="btn-focus-exit" class="fm-exit-btn" title="Exit focus mode (Esc)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Exit
+      </button>
+    </div>
+
+    <!-- Main area: ring + tasks -->
+    <div class="fm-main">
+
+      <!-- Circular ring timer -->
+      <div class="fm-ring-wrap">
+        <svg class="fm-ring-svg" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+          <!-- Track -->
+          <circle class="fm-ring-track" cx="160" cy="160" r="140"/>
+          <!-- Progress arc -->
+          <circle id="fm-ring-arc" class="fm-ring-arc" cx="160" cy="160" r="140"
+            stroke-dasharray="879.65" stroke-dashoffset="0"
+            transform="rotate(-90 160 160)"/>
+        </svg>
+
+        <!-- Content inside ring -->
+        <div class="fm-ring-inner">
+          <!-- FOCUS / BREAK tabs -->
+          <div class="fm-mode-tabs">
+            <button class="fm-mode-tab active" data-fmode="focus">FOCUS</button>
+            <button class="fm-mode-tab" data-fmode="break">BREAK</button>
+          </div>
+
+          <!-- Time -->
+          <div id="fm-time" class="fm-time">25:00</div>
+
+          <!-- Task name -->
+          <div id="fm-task-label" class="fm-task-label"></div>
+
+          <!-- Controls -->
+          <div class="fm-controls">
+            <button id="fm-start" class="fm-btn-start">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="fm-play-icon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="fm-pause-icon" class="hidden"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks sidebar -->
+      <div class="fm-tasks">
+        <div class="fm-tasks-header">Tasks</div>
+        <ul id="fm-todo-list" class="fm-todo-list"></ul>
+        <form id="fm-todo-form" class="fm-todo-form">
+          <input id="fm-todo-input" type="text" placeholder="Add a task…" maxlength="100" />
+          <button type="submit">+</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Bottom quote -->
+    <div class="fm-quote">
+      <span id="fm-quote-text"></span>
+    </div>
+  </div>
 
   <script type="module" src="./newtab.ts"></script>
 </body>

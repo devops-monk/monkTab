@@ -489,3 +489,169 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+/* ── Pomodoro: Focus Mode button ──────────────────────────────────────────── */
+.pomo-focus-btn {
+  display: flex; align-items: center; gap: 6px; justify-content: center;
+  width: 100%; margin-top: 10px; padding: 7px 12px;
+  background: transparent; border: 1px solid rgba(167,139,250,0.35);
+  border-radius: 8px; color: var(--accent); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all var(--transition);
+}
+.pomo-focus-btn:hover { background: rgba(167,139,250,0.12); border-color: var(--accent); }
+
+/* ── Focus Mode Overlay ───────────────────────────────────────────────────── */
+.focus-mode {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
+  animation: fm-in 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.focus-mode.hidden { display: none; }
+@keyframes fm-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Top bar */
+.fm-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 28px; flex-shrink: 0;
+}
+.fm-title {
+  font-size: 14px; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(255,255,255,0.55);
+}
+.fm-exit-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px; color: rgba(255,255,255,0.7); font-size: 12px;
+  padding: 6px 14px; cursor: pointer; transition: all var(--transition);
+}
+.fm-exit-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+
+/* Sound chip */
+.fm-sound-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px; padding: 6px 12px; min-width: 140px;
+}
+.fm-sound-ico { font-size: 14px; line-height: 1; }
+.fm-sound-lbl { font-size: 12px; color: rgba(255,255,255,0.75); flex: 1; }
+.fm-sound-stop {
+  background: rgba(255,255,255,0.08); border: none; border-radius: 50%;
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.5); cursor: pointer; transition: all var(--transition);
+}
+.fm-sound-stop:hover { background: rgba(255,255,255,0.18); color: #fff; }
+
+/* Main layout */
+.fm-main {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  gap: 72px; padding: 0 48px;
+}
+
+/* Ring */
+.fm-ring-wrap {
+  position: relative; width: 340px; height: 340px; flex-shrink: 0;
+}
+.fm-ring-svg { width: 100%; height: 100%; }
+.fm-ring-track {
+  fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 6;
+}
+.fm-ring-arc {
+  fill: none; stroke: rgba(255,255,255,0.85); stroke-width: 5;
+  stroke-linecap: round; transition: stroke-dashoffset 1s linear;
+}
+.fm-ring-inner {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+}
+
+/* Mode tabs */
+.fm-mode-tabs {
+  display: flex; gap: 24px; margin-bottom: 4px;
+}
+.fm-mode-tab {
+  background: none; border: none; font-size: 11px; font-weight: 700;
+  letter-spacing: 2px; color: rgba(255,255,255,0.35); cursor: pointer;
+  padding: 0; border-bottom: 2px solid transparent; padding-bottom: 2px;
+  transition: all 0.2s;
+}
+.fm-mode-tab.active { color: #fff; border-bottom-color: #fff; }
+
+/* Time */
+.fm-time {
+  font-size: clamp(56px, 9vw, 80px); font-weight: 200; letter-spacing: -3px;
+  color: #fff; line-height: 1; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 40px rgba(167,139,250,0.4);
+}
+
+/* Task label */
+.fm-task-label {
+  font-size: 13px; color: rgba(255,255,255,0.55); font-weight: 400;
+  max-width: 200px; text-align: center; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+}
+
+/* Play/pause button */
+.fm-controls { margin-top: 6px; }
+.fm-btn-start {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer; transition: all var(--transition);
+}
+.fm-btn-start:hover { background: rgba(255,255,255,0.25); border-color: #fff; transform: scale(1.06); }
+
+/* Tasks sidebar */
+.fm-tasks {
+  width: 260px; background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+  padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  max-height: 380px;
+}
+.fm-tasks-header {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(255,255,255,0.4);
+}
+.fm-todo-list {
+  list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.fm-todo-list li {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: rgba(255,255,255,0.85);
+}
+.fm-todo-list li.fm-done { text-decoration: line-through; color: rgba(255,255,255,0.35); }
+.fm-todo-list .fm-cb {
+  appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.35); background: transparent;
+  cursor: pointer; flex-shrink: 0; transition: all 0.2s; position: relative;
+}
+.fm-todo-list .fm-cb:checked { background: rgba(167,139,250,0.7); border-color: var(--accent); }
+.fm-todo-list .fm-cb:checked::after {
+  content: ''; position: absolute; left: 4px; top: 1.5px;
+  width: 5px; height: 8px; border: 2px solid #fff;
+  border-left: none; border-top: none; transform: rotate(45deg);
+}
+.fm-todo-form {
+  display: flex; gap: 6px;
+}
+.fm-todo-form input {
+  flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; padding: 7px 10px; color: #fff; font-size: 12px;
+}
+.fm-todo-form input::placeholder { color: rgba(255,255,255,0.3); }
+.fm-todo-form button {
+  background: rgba(167,139,250,0.25); border: 1px solid rgba(167,139,250,0.4);
+  border-radius: 8px; color: #fff; padding: 0 12px; cursor: pointer;
+  font-size: 16px; transition: all var(--transition);
+}
+.fm-todo-form button:hover { background: rgba(167,139,250,0.4); }
+
+/* Quote bar */
+.fm-quote {
+  padding: 16px 24px; text-align: center; flex-shrink: 0;
+  font-size: 13px; color: rgba(255,255,255,0.4); font-style: italic;
+  max-width: 600px; margin: 0 auto;
+}

@@ -448,15 +448,18 @@ function initSoundscapes() {
       if (activeId === sc.id) {
         stopSoundscape();
         activeId = null;
+        fmSoundInfo = null;
         grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
         updateNowPlaying(null);
       } else {
         activeId = sc.id;
+        fmSoundInfo = { label: sc.label, icon: sc.svg.includes('<') ? '♪' : sc.svg };
         playSoundscape(sc.id, parseInt(volumeSlider.value, 10));
         grid.querySelectorAll<HTMLButtonElement>('.sound-btn').forEach(b =>
           b.classList.toggle('active', b.dataset['id'] === sc.id));
         updateNowPlaying(sc.label);
       }
+      updateFmSoundChip();
     });
     grid.appendChild(btn);
   });
@@ -554,6 +557,7 @@ function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
       ytGrid.classList.add('hidden');
       playerView.classList.remove('hidden');
       titleEl.textContent = `${v.title} · ${v.ch}`;
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
       iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
       // Fallback if embedding blocked
       const fallback = document.getElementById('yt-fallback') as HTMLElement;
@@ -609,7 +613,9 @@ let pomoRunning = false;
 
 function updatePomoTask() {
   const task = todos.find(t => !t.done);
-  (document.getElementById('pomo-task') as HTMLElement).textContent = task?.text ?? '';
+  const text = task?.text ?? '';
+  (document.getElementById('pomo-task') as HTMLElement).textContent = text;
+  if (fmTaskLabelEl) fmTaskLabelEl.textContent = text;
 }
 
 function formatPomo(s: number) {
@@ -620,6 +626,7 @@ function renderPomo() {
   (document.getElementById('pomo-timer') as HTMLElement).textContent = formatPomo(pomoSecondsLeft);
   (document.getElementById('pomo-start') as HTMLButtonElement).textContent = pomoRunning ? 'Pause' : 'Start';
   document.title = pomoRunning ? `${formatPomo(pomoSecondsLeft)} — MonkTab` : 'MonkTab';
+  syncFocusMode();
 }
 
 function initPomodoro() {
@@ -741,6 +748,155 @@ async function renderFocusStats() {
       <span class="fc-day${isToday ? ' fc-day-today' : ''}">${d.label}</span>
     </div>`;
   }).join('');
+}
+
+// ─── Focus Mode ───────────────────────────────────────────────────────────────
+
+const FM_CIRC = 879.65; // 2π × 140
+
+let focusModeActive = false;
+// References to focus mode elements (set once on init)
+let fmTimeEl: HTMLElement | null = null;
+let fmArcEl: SVGCircleElement | null = null;
+let fmTaskLabelEl: HTMLElement | null = null;
+let fmPlayIcon: HTMLElement | null = null;
+let fmPauseIcon: HTMLElement | null = null;
+
+// Called by renderPomo every second to keep focus mode in sync
+function syncFocusMode() {
+  if (!focusModeActive || !fmTimeEl || !fmArcEl) return;
+  fmTimeEl.textContent = formatPomo(pomoSecondsLeft);
+  const total = POMO_DURATIONS[pomoMode];
+  const progress = (total - pomoSecondsLeft) / total;
+  fmArcEl.style.strokeDashoffset = String(FM_CIRC * (1 - progress));
+  if (fmPlayIcon && fmPauseIcon) {
+    fmPlayIcon.classList.toggle('hidden', pomoRunning);
+    fmPauseIcon.classList.toggle('hidden', !pomoRunning);
+  }
+  // Sync mode tabs
+  document.querySelectorAll<HTMLButtonElement>('.fm-mode-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset['fmode'] === pomoMode));
+}
+
+// Render todos in focus mode sidebar
+function renderFmTodos() {
+  const list = document.getElementById('fm-todo-list') as HTMLUListElement;
+  if (!list) return;
+  list.innerHTML = '';
+  if (todos.length === 0) {
+    list.innerHTML = '<li style="color:rgba(255,255,255,0.3);font-size:12px">No tasks yet</li>';
+    return;
+  }
+  todos.forEach((todo) => {
+    const li = document.createElement('li');
+    li.className = todo.done ? 'fm-done' : '';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'fm-cb'; cb.checked = todo.done;
+    cb.addEventListener('change', () => {
+      todo.done = cb.checked;
+      saveTodos(todos);
+      li.className = todo.done ? 'fm-done' : '';
+      updatePomoTask();
+    });
+    const span = document.createElement('span');
+    span.textContent = todo.text;
+    li.append(cb, span);
+    list.appendChild(li);
+  });
+}
+
+// Currently-playing sound info exposed by initSoundscapes
+let fmSoundInfo: { label: string; icon: string } | null = null;
+
+function updateFmSoundChip() {
+  const lbl = document.getElementById('fm-sound-label');
+  const ico = document.getElementById('fm-sound-icon');
+  if (!lbl || !ico) return;
+  if (fmSoundInfo) {
+    lbl.textContent = fmSoundInfo.label;
+    ico.textContent = fmSoundInfo.icon;
+  } else {
+    lbl.textContent = 'No sound';
+    ico.textContent = '';
+  }
+}
+
+function enterFocusMode() {
+  focusModeActive = true;
+  const overlay = document.getElementById('focus-mode') as HTMLElement;
+  overlay.classList.remove('hidden');
+  fmTimeEl = document.getElementById('fm-time');
+  fmArcEl = document.getElementById('fm-ring-arc') as unknown as SVGCircleElement;
+  fmTaskLabelEl = document.getElementById('fm-task-label');
+  fmPlayIcon = document.getElementById('fm-play-icon');
+  fmPauseIcon = document.getElementById('fm-pause-icon');
+
+  // Sync quote
+  const qtSrc = document.getElementById('quote-text')?.textContent ?? '';
+  const qEl = document.getElementById('fm-quote-text');
+  if (qEl) qEl.textContent = qtSrc;
+
+  renderFmTodos();
+  updateFmSoundChip();
+  syncFocusMode();
+  updatePomoTask(); // also updates fm-task-label via the extended version below
+}
+
+function exitFocusMode() {
+  focusModeActive = false;
+  document.getElementById('focus-mode')?.classList.add('hidden');
+}
+
+function initFocusMode() {
+  // Enter button in pomo panel
+  document.getElementById('btn-enter-focus')?.addEventListener('click', () => {
+    // Close pomo panel so it doesn't sit on top
+    document.getElementById('pomodoro-panel')?.classList.add('hidden');
+    enterFocusMode();
+  });
+
+  // Exit button
+  document.getElementById('btn-focus-exit')?.addEventListener('click', exitFocusMode);
+
+  // ESC key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && focusModeActive) exitFocusMode();
+  });
+
+  // Mode tabs in focus overlay mirror the pomo tabs
+  document.querySelectorAll<HTMLButtonElement>('.fm-mode-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Trigger the matching pomo tab click
+      const mode = btn.dataset['fmode'] as 'focus' | 'break';
+      document.querySelectorAll<HTMLButtonElement>('.pomo-tab').forEach(pb => {
+        if (pb.dataset['mode'] === mode) pb.click();
+      });
+    });
+  });
+
+  // Play/pause in focus overlay mirrors pomo start button
+  document.getElementById('fm-start')?.addEventListener('click', () => {
+    document.getElementById('pomo-start')?.click();
+    syncFocusMode();
+  });
+
+  // Sound stop chip button
+  document.getElementById('fm-sound-toggle')?.addEventListener('click', () => {
+    stopSoundscape();
+    fmSoundInfo = null;
+    updateFmSoundChip();
+  });
+
+  // Focus mode task form
+  const fmForm = document.getElementById('fm-todo-form') as HTMLFormElement;
+  const fmInput = document.getElementById('fm-todo-input') as HTMLInputElement;
+  fmForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = fmInput.value.trim();
+    if (!text) return;
+    todos.push({ id: Date.now().toString(), text, done: false });
+    saveTodos(todos); renderTodos(); renderFmTodos(); fmInput.value = ''; updatePomoTask();
+  });
 }
 
 // ─── Vision Board (custom backgrounds) ───────────────────────────────────────
@@ -1017,6 +1173,7 @@ async function init() {
   await initCountdowns();
   initBookmarkImport();
   initPomodoro();
+  initFocusMode();
   initQuoteRefresh();
   initAI(settings.aiProvider);
   initSoundscapes();
