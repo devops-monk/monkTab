@@ -118,20 +118,33 @@ function renderWorldClocks(clocks: WorldClock[]) {
   clocks.forEach(({ label, timezone }) => {
     const card = document.createElement('div');
     card.className = 'world-clock-card';
+
+    const cityEl = document.createElement('div');
+    cityEl.className = 'world-clock-city';
+    cityEl.textContent = label;
+
     const timeEl = document.createElement('div');
     timeEl.className = 'world-clock-time';
-    const labelEl = document.createElement('div');
-    labelEl.className = 'world-clock-label';
-    labelEl.textContent = label;
-    card.append(timeEl, labelEl);
+
+    const dateEl = document.createElement('div');
+    dateEl.className = 'world-clock-date';
+
+    card.append(cityEl, timeEl, dateEl);
     bar.appendChild(card);
 
     const update = () => {
       try {
-        timeEl.textContent = new Date().toLocaleTimeString('en-GB', {
+        const now = new Date();
+        timeEl.textContent = now.toLocaleTimeString('en-GB', {
           timeZone: timezone, hour: '2-digit', minute: '2-digit',
         });
-      } catch { timeEl.textContent = '--:--'; }
+        dateEl.textContent = now.toLocaleDateString('en-GB', {
+          timeZone: timezone, day: '2-digit', month: '2-digit', year: 'numeric',
+        });
+      } catch {
+        timeEl.textContent = '--:--';
+        dateEl.textContent = '--/--/----';
+      }
     };
     update();
     setInterval(update, 10000);
