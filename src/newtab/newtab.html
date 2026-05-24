@@ -677,13 +677,32 @@
 
     <!-- Top bar -->
     <div class="fm-topbar">
-      <!-- Sound chip -->
-      <div id="fm-sound-chip" class="fm-sound-chip">
-        <span id="fm-sound-icon" class="fm-sound-ico"></span>
-        <span id="fm-sound-label" class="fm-sound-lbl">No sound</span>
-        <button id="fm-sound-toggle" class="fm-sound-stop" title="Stop sound">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+
+      <!-- Sound control area -->
+      <div class="fm-sound-area">
+        <!-- Chip / now-playing (click to open picker) -->
+        <button id="fm-sound-chip" class="fm-sound-chip" title="Choose a sound">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          <span id="fm-sound-label">Sounds</span>
+          <span id="fm-sound-playing" class="fm-sound-playing hidden">
+            <span class="fm-sound-pulse"></span>
+            <span id="fm-sound-name"></span>
+          </span>
         </button>
+
+        <!-- Mini sound picker panel -->
+        <div id="fm-sound-picker" class="fm-sound-picker hidden">
+          <div class="fm-sp-header">
+            <span>Ambient Sounds</span>
+            <div class="fm-sp-vol">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>
+              <input id="fm-volume" type="range" min="0" max="100" value="50" />
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            </div>
+          </div>
+          <div id="fm-sound-grid" class="fm-sound-grid"></div>
+          <div id="fm-variant-bar" class="fm-variant-bar hidden"></div>
+        </div>
       </div>
 
       <span class="fm-title">Focusing</span>

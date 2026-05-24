@@ -530,7 +530,7 @@ function initSoundscapes() {
     stopSoundscape();
     activeVariantId = variantId;
     activeCatId = catId;
-    fmSoundInfo = { label: variantLabel, icon: '♪' };
+    fmSoundInfo = { label: variantLabel, variantId };
     playSoundscape(variantId, parseInt(volumeSlider.value, 10));
     updateNowPlaying(variantLabel);
     updateFmSoundChip();
@@ -909,19 +909,18 @@ function renderFmTodos() {
   });
 }
 
-// Currently-playing sound info exposed by initSoundscapes
-let fmSoundInfo: { label: string; icon: string } | null = null;
+// Shared sound state between main panel and focus mode
+let fmSoundInfo: { label: string; variantId: string } | null = null;
 
 function updateFmSoundChip() {
-  const lbl = document.getElementById('fm-sound-label');
-  const ico = document.getElementById('fm-sound-icon');
-  if (!lbl || !ico) return;
+  const playingEl = document.getElementById('fm-sound-playing');
+  const nameEl = document.getElementById('fm-sound-name');
+  if (!playingEl || !nameEl) return;
   if (fmSoundInfo) {
-    lbl.textContent = fmSoundInfo.label;
-    ico.textContent = fmSoundInfo.icon;
+    nameEl.textContent = fmSoundInfo.label;
+    playingEl.classList.remove('hidden');
   } else {
-    lbl.textContent = 'No sound';
-    ico.textContent = '';
+    playingEl.classList.add('hidden');
   }
 }
 
@@ -954,23 +953,19 @@ function exitFocusMode() {
 function initFocusMode() {
   // Enter button in pomo panel
   document.getElementById('btn-enter-focus')?.addEventListener('click', () => {
-    // Close pomo panel so it doesn't sit on top
     document.getElementById('pomodoro-panel')?.classList.add('hidden');
     enterFocusMode();
   });
 
-  // Exit button
+  // Exit button + ESC
   document.getElementById('btn-focus-exit')?.addEventListener('click', exitFocusMode);
-
-  // ESC key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && focusModeActive) exitFocusMode();
   });
 
-  // Mode tabs in focus overlay mirror the pomo tabs
+  // Mode tabs mirror pomo tabs
   document.querySelectorAll<HTMLButtonElement>('.fm-mode-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      // Trigger the matching pomo tab click
       const mode = btn.dataset['fmode'] as 'focus' | 'break';
       document.querySelectorAll<HTMLButtonElement>('.pomo-tab').forEach(pb => {
         if (pb.dataset['mode'] === mode) pb.click();
@@ -978,17 +973,98 @@ function initFocusMode() {
     });
   });
 
-  // Play/pause in focus overlay mirrors pomo start button
+  // Play/pause mirrors pomo start
   document.getElementById('fm-start')?.addEventListener('click', () => {
     document.getElementById('pomo-start')?.click();
     syncFocusMode();
   });
 
-  // Sound stop chip button
-  document.getElementById('fm-sound-toggle')?.addEventListener('click', () => {
-    stopSoundscape();
-    fmSoundInfo = null;
-    updateFmSoundChip();
+  // ── Focus Mode Mini Sound Picker ──────────────────────────────────────────
+  const chip = document.getElementById('fm-sound-chip') as HTMLButtonElement;
+  const picker = document.getElementById('fm-sound-picker') as HTMLElement;
+  const fmGrid = document.getElementById('fm-sound-grid') as HTMLElement;
+  const fmVariantBar = document.getElementById('fm-variant-bar') as HTMLElement;
+  const fmVol = document.getElementById('fm-volume') as HTMLInputElement;
+  let fmActiveCat: string | null = null;
+  let fmActiveVariant: string | null = null;
+
+  // Toggle picker open/close
+  chip.addEventListener('click', () => {
+    picker.classList.toggle('hidden');
+  });
+  // Close picker when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!chip.contains(e.target as Node) && !picker.contains(e.target as Node)) {
+      picker.classList.add('hidden');
+    }
+  });
+
+  // Volume slider synced with main slider
+  fmVol.value = (document.getElementById('sound-volume') as HTMLInputElement)?.value ?? '50';
+  fmVol.addEventListener('input', () => {
+    setSoundVolume(parseInt(fmVol.value, 10));
+    const mainSlider = document.getElementById('sound-volume') as HTMLInputElement;
+    if (mainSlider) mainSlider.value = fmVol.value;
+  });
+
+  function fmShowVariants(sc: typeof SOUNDSCAPES[0]) {
+    fmVariantBar.innerHTML = '';
+    fmVariantBar.classList.remove('hidden');
+    sc.variants.forEach((v, i) => {
+      const chip2 = document.createElement('button');
+      chip2.className = `sv-chip${fmActiveVariant === v.id ? ' active' : ''}`;
+      chip2.textContent = v.label;
+      chip2.addEventListener('click', () => {
+        if (fmActiveVariant === v.id) {
+          // Toggle off
+          stopSoundscape();
+          fmActiveVariant = null; fmActiveCat = null; fmSoundInfo = null;
+          fmGrid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+          fmVariantBar.querySelectorAll('.sv-chip').forEach(c => c.classList.remove('active'));
+          fmVariantBar.classList.add('hidden');
+          updateFmSoundChip();
+          // Also sync main panel
+          document.getElementById('sound-grid')?.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+          document.getElementById('sound-now-playing')?.parentElement?.classList.add('hidden');
+          return;
+        }
+        stopSoundscape();
+        fmActiveVariant = v.id; fmActiveCat = sc.id;
+        fmSoundInfo = { label: v.label, variantId: v.id };
+        playSoundscape(v.id, parseInt(fmVol.value, 10));
+        fmVariantBar.querySelectorAll('.sv-chip').forEach(c => c.classList.remove('active'));
+        chip2.classList.add('active');
+        updateFmSoundChip();
+        // Sync now-playing in main panel too
+        const mainNp = document.getElementById('sound-now-playing');
+        if (mainNp) { mainNp.textContent = v.label; mainNp.parentElement?.classList.remove('hidden'); }
+      });
+      fmVariantBar.appendChild(chip2);
+      if (i === 0 && fmActiveCat !== sc.id) chip2.click();
+    });
+  }
+
+  // Build the FM sound grid
+  SOUNDSCAPES.forEach(sc => {
+    const btn = document.createElement('button');
+    btn.className = 'sound-btn fm-sc-btn';
+    btn.dataset['id'] = sc.id;
+    btn.innerHTML = `<span class="sound-icon">${sc.svg}</span><span class="sound-label">${sc.label}</span>`;
+    btn.addEventListener('click', () => {
+      if (fmActiveCat === sc.id) {
+        stopSoundscape();
+        fmActiveCat = null; fmActiveVariant = null; fmSoundInfo = null;
+        fmGrid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+        fmVariantBar.classList.add('hidden');
+        updateFmSoundChip();
+        return;
+      }
+      fmGrid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      fmActiveCat = sc.id; fmActiveVariant = null;
+      fmShowVariants(sc);
+    });
+    fmGrid.appendChild(btn);
   });
 
   // Focus mode task form
