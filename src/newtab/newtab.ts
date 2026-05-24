@@ -520,33 +520,51 @@ function initAI(defaultProvider: string) {
 function initSoundscapes() {
   const panel = document.getElementById('sound-panel') as HTMLElement;
   const grid = document.getElementById('sound-grid') as HTMLElement;
+  const variantBar = document.getElementById('sound-variant-bar') as HTMLElement;
   const volumeSlider = document.getElementById('sound-volume') as HTMLInputElement;
-  let activeId: string | null = null;
+  let activeCatId: string | null = null;   // which category card is highlighted
+  let activeVariantId: string | null = null; // which variant is actually playing
 
-  SOUNDSCAPES.forEach(sc => {
-    const btn = document.createElement('button');
-    btn.className = 'sound-btn';
-    btn.dataset['id'] = sc.id;
-    btn.innerHTML = `<span class="sound-icon">${sc.svg}</span><span class="sound-label">${sc.label}</span>`;
-    btn.addEventListener('click', () => {
-      if (activeId === sc.id) {
-        stopSoundscape();
-        activeId = null;
-        fmSoundInfo = null;
-        grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
-        updateNowPlaying(null);
-      } else {
-        activeId = sc.id;
-        fmSoundInfo = { label: sc.label, icon: sc.svg.includes('<') ? '♪' : sc.svg };
-        playSoundscape(sc.id, parseInt(volumeSlider.value, 10));
-        grid.querySelectorAll<HTMLButtonElement>('.sound-btn').forEach(b =>
-          b.classList.toggle('active', b.dataset['id'] === sc.id));
-        updateNowPlaying(sc.label);
-      }
-      updateFmSoundChip();
+  function playVariant(variantId: string, variantLabel: string, catId: string) {
+    // Stop any previously playing sound (fix mixing bug)
+    stopSoundscape();
+    activeVariantId = variantId;
+    activeCatId = catId;
+    fmSoundInfo = { label: variantLabel, icon: '♪' };
+    playSoundscape(variantId, parseInt(volumeSlider.value, 10));
+    updateNowPlaying(variantLabel);
+    updateFmSoundChip();
+  }
+
+  function showVariants(sc: typeof SOUNDSCAPES[0]) {
+    variantBar.innerHTML = '';
+    variantBar.classList.remove('hidden');
+
+    sc.variants.forEach((v, i) => {
+      const chip = document.createElement('button');
+      chip.className = `sv-chip${activeVariantId === v.id ? ' active' : ''}`;
+      chip.textContent = v.label;
+      chip.addEventListener('click', () => {
+        // If same variant is playing — stop it (toggle off)
+        if (activeVariantId === v.id) {
+          stopSoundscape();
+          activeVariantId = null; activeCatId = null;
+          fmSoundInfo = null;
+          grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+          variantBar.querySelectorAll('.sv-chip').forEach(c => c.classList.remove('active'));
+          variantBar.classList.add('hidden');
+          updateNowPlaying(null); updateFmSoundChip();
+          return;
+        }
+        playVariant(v.id, v.label, sc.id);
+        variantBar.querySelectorAll('.sv-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+      variantBar.appendChild(chip);
+      // Auto-play the first variant when category is first selected
+      if (i === 0 && activeCatId !== sc.id) chip.click();
     });
-    grid.appendChild(btn);
-  });
+  }
 
   function updateNowPlaying(label: string | null) {
     const el = document.getElementById('sound-now-playing');
@@ -559,6 +577,32 @@ function initSoundscapes() {
     }
   }
 
+  SOUNDSCAPES.forEach(sc => {
+    const btn = document.createElement('button');
+    btn.className = 'sound-btn';
+    btn.dataset['id'] = sc.id;
+    btn.innerHTML = `<span class="sound-icon">${sc.svg}</span><span class="sound-label">${sc.label}</span>`;
+    btn.addEventListener('click', () => {
+      const isActive = activeCatId === sc.id;
+      if (isActive) {
+        // Toggle off — stop everything and hide variants
+        stopSoundscape();
+        activeCatId = null; activeVariantId = null; fmSoundInfo = null;
+        grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+        variantBar.classList.add('hidden');
+        variantBar.innerHTML = '';
+        updateNowPlaying(null); updateFmSoundChip();
+        return;
+      }
+      // Switch to this category — deselect old
+      grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeCatId = sc.id; activeVariantId = null;
+      showVariants(sc);
+    });
+    grid.appendChild(btn);
+  });
+
   volumeSlider.addEventListener('input', () => setSoundVolume(parseInt(volumeSlider.value, 10)));
 
   // ── Tab switching (Soundscapes / YouTube) ──
@@ -569,14 +613,13 @@ function initSoundscapes() {
       tab.classList.add('active');
       const isYt = tab.dataset['tab'] === 'youtube';
       grid.classList.toggle('hidden', isYt);
+      variantBar.classList.toggle('hidden', isYt);
       ytSection.classList.toggle('hidden', !isYt);
-      if (!isYt) {
-        updateNowPlaying(activeId ? SOUNDSCAPES.find(s => s.id === activeId)?.label ?? null : null);
-      } else {
-        stopSoundscape(); activeId = null;
-        fmSoundInfo = null;
+      if (isYt) {
+        // Stop soundscape when switching to YouTube
+        stopSoundscape(); activeCatId = null; activeVariantId = null; fmSoundInfo = null;
         grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
-        updateNowPlaying(null);
+        updateNowPlaying(null); updateFmSoundChip();
       }
     });
   });
@@ -590,10 +633,10 @@ function initSoundscapes() {
   document.getElementById('btn-sound-close')?.addEventListener('click', () => {
     panel.classList.add('hidden');
     stopSoundscape();
-    activeId = null;
-    fmSoundInfo = null;
+    activeCatId = null; activeVariantId = null; fmSoundInfo = null;
     grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
-    updateNowPlaying(null);
+    variantBar.classList.add('hidden');
+    updateNowPlaying(null); updateFmSoundChip();
   });
 }
 
