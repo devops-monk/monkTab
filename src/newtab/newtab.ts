@@ -450,6 +450,34 @@ function initSoundscapes() {
 
   volumeSlider.addEventListener('input', () => setSoundVolume(parseInt(volumeSlider.value, 10)));
 
+  // ── Tab switching (Soundscapes / YouTube) ──
+  const ytSection = document.getElementById('yt-section') as HTMLElement;
+  panel.querySelectorAll<HTMLButtonElement>('.sound-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      panel.querySelectorAll('.sound-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const isYt = tab.dataset['tab'] === 'youtube';
+      grid.classList.toggle('hidden', isYt);
+      ytSection.classList.toggle('hidden', !isYt);
+      if (!isYt) {
+        // Stop YouTube when switching back
+        const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
+        iframe.src = '';
+        document.getElementById('yt-player-view')?.classList.add('hidden');
+        document.getElementById('yt-grid')?.classList.remove('hidden');
+        updateNowPlaying(activeId ? SOUNDSCAPES.find(s => s.id === activeId)?.label ?? null : null);
+      } else {
+        // Stop soundscape when switching to YouTube
+        stopSoundscape(); activeId = null;
+        grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+        updateNowPlaying(null);
+      }
+    });
+  });
+
+  // ── YouTube beats ──
+  initYouTubeBeats(updateNowPlaying);
+
   document.getElementById('btn-sound-toggle')?.addEventListener('click', () => {
     panel.classList.toggle('hidden');
   });
@@ -458,6 +486,59 @@ function initSoundscapes() {
     stopSoundscape();
     activeId = null;
     grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+    const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
+    iframe.src = '';
+    updateNowPlaying(null);
+  });
+}
+
+// ─── YouTube Beats ────────────────────────────────────────────────────────────
+
+const YT_VIDEOS = [
+  { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio' },
+  { id: '4xDzrJKXOOY', title: 'Synthwave Radio' },
+  { id: 'DWcJFNfaw9c', title: 'Brown Noise · 8 Hours' },
+  { id: 'HuFYqnbVbzY', title: 'Classical Music for Studying' },
+  { id: 'lTRiuFIWV54', title: 'Deep Focus Music' },
+  { id: 'sjkrrmBnpGE', title: 'Jazz & Bossa Nova Radio' },
+  { id: '5qap5aO4i9A', title: 'Chillhop Radio' },
+  { id: '36YnV9STBqc', title: 'Piano for Studying' },
+  { id: '21qNxnCS8WU', title: 'Coffee Shop Ambience' },
+  { id: 'rUxyKA_-grg', title: 'Peaceful Piano' },
+  { id: 'MVPTGNGiI-4', title: 'Chill Beats to Study' },
+  { id: 'n61ULEU7CO0', title: 'Nature Sounds for Focus' },
+];
+
+function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
+  const ytGrid = document.getElementById('yt-grid') as HTMLElement;
+  const playerView = document.getElementById('yt-player-view') as HTMLElement;
+  const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
+  const titleEl = document.getElementById('yt-player-title') as HTMLElement;
+
+  YT_VIDEOS.forEach(v => {
+    const card = document.createElement('div');
+    card.className = 'yt-card';
+    card.innerHTML = `
+      <div class="yt-thumb-wrap">
+        <img class="yt-thumb" src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="${v.title}" loading="lazy" />
+        <div class="yt-play-overlay"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+      </div>
+      <span class="yt-card-title">${v.title}</span>
+    `;
+    card.addEventListener('click', () => {
+      ytGrid.classList.add('hidden');
+      playerView.classList.remove('hidden');
+      titleEl.textContent = v.title;
+      iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+      updateNowPlaying(v.title);
+    });
+    ytGrid.appendChild(card);
+  });
+
+  document.getElementById('btn-yt-back')?.addEventListener('click', () => {
+    playerView.classList.add('hidden');
+    ytGrid.classList.remove('hidden');
+    iframe.src = '';
     updateNowPlaying(null);
   });
 }
