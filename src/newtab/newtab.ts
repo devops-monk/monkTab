@@ -18,6 +18,9 @@ function updateClock() {
   const h = String(now.getHours()).padStart(2, '0');
   const m = String(now.getMinutes()).padStart(2, '0');
   (document.getElementById('clock') as HTMLElement).textContent = `${h}:${m}`;
+  (document.getElementById('clock-date') as HTMLElement).textContent = now.toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
 }
 updateClock();
 setInterval(updateClock, 1000);

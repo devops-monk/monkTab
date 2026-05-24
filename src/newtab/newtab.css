@@ -101,6 +101,15 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   background-clip: text;
   filter: drop-shadow(0 0 48px rgba(167,139,250,0.28)) drop-shadow(0 4px 24px rgba(0,0,0,0.55));
 }
+.clock-date {
+  font-size: clamp(14px, 1.4vw, 20px);
+  font-weight: 300;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  text-shadow: 0 1px 12px rgba(0,0,0,0.7);
+  margin-top: -4px;
+}
 .greeting {
   font-size: clamp(18px, 2.2vw, 28px);
   font-weight: 300;
