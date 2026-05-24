@@ -513,12 +513,65 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   color: #fff; box-shadow: 0 0 12px rgba(167,139,250,0.2);
 }
 
-/* ── YouTube Beats (launcher — opens in new tab) ── */
+/* ── YouTube Beats ── */
 .yt-section { width: 100%; display: flex; flex-direction: column; gap: 8px; }
 .yt-hint {
   display: flex; align-items: center; gap: 6px;
   font-size: 11px; color: var(--text-dimmer); padding: 0 2px;
 }
+
+/* Add custom video form */
+.yt-add-form {
+  display: flex; gap: 6px; align-items: center;
+}
+.yt-add-input {
+  flex: 1; background: rgba(255,255,255,0.06); border: 1px solid var(--panel-border);
+  border-radius: 8px; padding: 7px 11px; font-size: 12px; color: var(--text);
+  outline: none; transition: border-color 0.2s;
+  font-family: inherit;
+}
+.yt-add-input::placeholder { color: var(--text-dimmer); }
+.yt-add-input:focus { border-color: rgba(167,139,250,0.5); }
+.yt-add-input.yt-add-error { border-color: #f87171; animation: shake 0.3s ease; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+.yt-add-btn {
+  display: flex; align-items: center; gap: 4px; white-space: nowrap;
+  background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4);
+  border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 500;
+  color: #c4b5fd; cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.yt-add-btn:hover { background: rgba(139,92,246,0.35); border-color: rgba(139,92,246,0.6); color: #fff; }
+.yt-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Section dividers inside grid */
+.yt-section-hdr {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--text-dimmer); padding: 4px 2px 2px;
+}
+.yt-section-hdr::after {
+  content: ''; flex: 1; height: 1px; background: var(--panel-border);
+}
+.yt-count {
+  background: rgba(139,92,246,0.25); color: #c4b5fd;
+  border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: 600;
+}
+
+/* Custom card delete button */
+.yt-card-custom { position: relative; }
+.yt-del-btn {
+  position: absolute; top: 5px; right: 5px; z-index: 2;
+  background: rgba(0,0,0,0.65); border: none; border-radius: 50%;
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.7); cursor: pointer; opacity: 0; transition: opacity 0.15s;
+}
+.yt-card-custom:hover .yt-del-btn { opacity: 1; }
+.yt-del-btn:hover { background: rgba(239,68,68,0.7); color: #fff; }
 
 .yt-grid {
   display: grid;

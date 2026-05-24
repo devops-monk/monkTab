@@ -1,8 +1,9 @@
 import {
   getSettings, saveSettings, getDaily, saveDaily, getTodos, saveTodos,
   getLinks, saveLinks, getNotes, saveNotes, getCountdowns, saveCountdowns,
-  getFocusHistory, logFocusSession,
+  getFocusHistory, logFocusSession, getCustomYtVideos, saveCustomYtVideos,
   todayString, type Todo, type QuickLink, type Countdown, type WorldClock, type Settings,
+  type CustomYtVideo,
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
 import { getBackground } from '../utils/background';
@@ -625,7 +626,7 @@ function initSoundscapes() {
   });
 
   // ── YouTube beats ──
-  initYouTubeBeats(updateNowPlaying);
+  void initYouTubeBeats(updateNowPlaying);
 
   document.getElementById('btn-sound-toggle')?.addEventListener('click', () => {
     panel.classList.toggle('hidden');
@@ -644,59 +645,192 @@ function initSoundscapes() {
 
 // All videos verified embeddable (youtube-nocookie.com)
 const YT_VIDEOS = [
-  // Lofi / Chillhop — regular uploaded videos (not live streams)
+  // Lofi / Chillhop
   { id: 'CFGLoQIhmow', title: 'Lofi Hip Hop Mix',         ch: 'Lofi Girl' },
   { id: 'n61ULEU7CO0', title: 'Best of Lofi 2021',        ch: 'Lofi Girl' },
   { id: 'HFQibg2OJkU', title: 'Chillhop Spring 2025',    ch: 'Chillhop Music' },
   { id: '5yx6BWlEVcY', title: 'Chillhop Radio Mix',       ch: 'Chillhop Music' },
   { id: 'D_uLM5i0Z4c', title: 'Endless Sunday',           ch: 'Chillhop Music' },
   { id: 'zUD8p1Nt7GM', title: 'Morning Jazz Lofi',        ch: 'The Jazz Hop Café' },
-  // Piano
+  // Piano & Relaxation
   { id: 'E7EOjkGVmyo', title: 'Relaxing Piano · 1h',      ch: "Jacob's Piano" },
-  { id: 'Ne2TcmhGrLU', title: 'Beautiful Soundtracks',    ch: "Jacob's Piano" },
+  { id: 'lCOF9LN_Zxs', title: 'Beautiful Piano Music',   ch: 'Soothing Relaxation' },
   { id: 'sCwtp2lmUEU', title: 'Felt Piano · 30min',       ch: "Jacob's Piano" },
   { id: '1ZYbU82GVz4', title: 'Sleep & Relax Music',      ch: 'Soothing Relaxation' },
   // Ambient / Focus
   { id: 'lTRiuFIWV54', title: 'Deep Focus Music',         ch: 'Greenred Productions' },
-  { id: 'wzAz4QB_NKI', title: 'Study Ambient Music',      ch: 'Greenred Productions' },
+  { id: 'WPni755-Krg', title: 'Study Music Alpha Waves',  ch: 'Yellow Brick Cinema' },
   { id: '4GnVDPD01as', title: 'Ambient Study · 4h',       ch: 'Focus Music' },
-  // Nature
+  // Nature & Atmosphere
   { id: 'eKFTSSKCzWA', title: 'Nature Sounds · 8h',       ch: 'Nature Sounds' },
+  { id: '77ZozI0rw7w', title: 'Piano & Water Sounds',     ch: 'Soothing Relaxation' },
+  { id: 'V1RPi2MYptM', title: 'Zen Music & Water',        ch: 'Soothing Relaxation' },
   { id: 'sjkrrmBnpGE', title: 'Jazz & Bossa Nova',        ch: 'Lofi Jazz' },
   { id: '2gliGzb2_1I', title: 'Coffee Shop Ambience',     ch: 'Ambient Sounds' },
 ];
 
-function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
+// ─── YouTube helpers ──────────────────────────────────────────────────────────
+
+function parseYouTubeId(input: string): string | null {
+  input = input.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+  const m = input.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+async function fetchYtTitle(id: string): Promise<string> {
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
+    if (!r.ok) return 'Custom Video';
+    const d = await r.json();
+    return (d.title as string) || 'Custom Video';
+  } catch { return 'Custom Video'; }
+}
+
+function buildYtCard(
+  id: string, title: string, ch: string, isCustom: boolean,
+  onPlay: (id: string, title: string, ch: string) => void,
+  onDelete?: (id: string) => void,
+): HTMLElement {
+  const card = document.createElement('div');
+  card.className = 'yt-card' + (isCustom ? ' yt-card-custom' : '');
+  card.innerHTML = `
+    <div class="yt-thumb-wrap">
+      <img class="yt-thumb" src="https://img.youtube.com/vi/${id}/mqdefault.jpg" alt="${title}" loading="lazy"/>
+      <div class="yt-play-overlay"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+    </div>
+    <div class="yt-card-info">
+      <span class="yt-card-title">${title}</span>
+      <span class="yt-card-ch">${ch}</span>
+    </div>
+    ${isCustom ? `<button class="yt-del-btn" title="Remove">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>` : ''}
+  `;
+  card.querySelector('.yt-thumb-wrap')?.addEventListener('click', () => onPlay(id, title, ch));
+  card.querySelector('.yt-card-info')?.addEventListener('click', () => onPlay(id, title, ch));
+  if (isCustom && onDelete) {
+    card.querySelector('.yt-del-btn')?.addEventListener('click', (e) => { e.stopPropagation(); onDelete(id); });
+  }
+  return card;
+}
+
+// Shared playlist state for auto-advance
+let ytPlaylist: Array<{ id: string; title: string; ch: string }> = [];
+let ytCurrentIdx = -1;
+let activeYtIframe: HTMLIFrameElement | null = null;
+let activeYtTitleEl: HTMLElement | null = null;
+let activeYtOpenLink: HTMLAnchorElement | null = null;
+let activeYtUpdateFn: ((label: string | null) => void) | null = null;
+
+function playYtVideo(id: string, title: string, ch: string,
+  iframe: HTMLIFrameElement, titleEl: HTMLElement, openLink: HTMLAnchorElement,
+  playerView: HTMLElement, grid: HTMLElement,
+  updateNowPlaying: (label: string | null) => void
+) {
+  ytCurrentIdx = ytPlaylist.findIndex(v => v.id === id);
+  activeYtIframe = iframe; activeYtTitleEl = titleEl;
+  activeYtOpenLink = openLink; activeYtUpdateFn = updateNowPlaying;
+  grid.classList.add('hidden');
+  playerView.classList.remove('hidden');
+  titleEl.textContent = `${title} · ${ch}`;
+  openLink.href = `https://www.youtube.com/watch?v=${id}`;
+  iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1`;
+  updateNowPlaying(title);
+}
+
+// Auto-advance when video ends
+window.addEventListener('message', (e) => {
+  if (e.origin !== 'https://www.youtube-nocookie.com') return;
+  try {
+    const data = JSON.parse(e.data as string);
+    if (data.event === 'onStateChange' && data.info === 0 && ytPlaylist.length > 0) {
+      const next = ytPlaylist[(ytCurrentIdx + 1) % ytPlaylist.length];
+      if (next && activeYtIframe && activeYtTitleEl && activeYtOpenLink && activeYtUpdateFn) {
+        ytCurrentIdx = (ytCurrentIdx + 1) % ytPlaylist.length;
+        activeYtTitleEl.textContent = `${next.title} · ${next.ch}`;
+        activeYtOpenLink.href = `https://www.youtube.com/watch?v=${next.id}`;
+        activeYtIframe.src = `https://www.youtube-nocookie.com/embed/${next.id}?autoplay=1&rel=0&enablejsapi=1`;
+        activeYtUpdateFn(next.title);
+      }
+    }
+  } catch { /* ignore non-JSON messages */ }
+});
+
+async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
   const ytGrid = document.getElementById('yt-grid') as HTMLElement;
   const playerView = document.getElementById('yt-player-view') as HTMLElement;
   const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
   const titleEl = document.getElementById('yt-player-title') as HTMLElement;
   const openLink = document.getElementById('yt-open-link') as HTMLAnchorElement;
 
-  YT_VIDEOS.forEach(v => {
-    const card = document.createElement('div');
-    card.className = 'yt-card';
-    card.innerHTML = `
-      <div class="yt-thumb-wrap">
-        <img class="yt-thumb" src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="${v.title}" loading="lazy" />
-        <div class="yt-play-overlay">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        </div>
-      </div>
-      <div class="yt-card-info">
-        <span class="yt-card-title">${v.title}</span>
-        <span class="yt-card-ch">${v.ch}</span>
-      </div>
-    `;
-    card.addEventListener('click', () => {
-      ytGrid.classList.add('hidden');
-      playerView.classList.remove('hidden');
-      titleEl.textContent = `${v.title} · ${v.ch}`;
-      openLink.href = `https://www.youtube.com/watch?v=${v.id}`;
-      iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
-      updateNowPlaying(v.title);
+  let customVideos = await getCustomYtVideos();
+
+  function rebuildPlaylist() {
+    ytPlaylist = [
+      ...customVideos.map(v => ({ id: v.id, title: v.title, ch: 'My Playlist' })),
+      ...YT_VIDEOS,
+    ];
+  }
+
+  function renderGrid() {
+    ytGrid.innerHTML = '';
+
+    // Custom section
+    if (customVideos.length > 0) {
+      const hdr = document.createElement('div');
+      hdr.className = 'yt-section-hdr';
+      hdr.innerHTML = `<span>MY PLAYLIST <span class="yt-count">${customVideos.length}</span></span>`;
+      ytGrid.appendChild(hdr);
+
+      customVideos.slice().reverse().forEach(v => {
+        const card = buildYtCard(v.id, v.title, 'My Playlist', true,
+          (id, t, ch) => playYtVideo(id, t, ch, iframe, titleEl, openLink, playerView, ytGrid, updateNowPlaying),
+          async (id) => {
+            customVideos = customVideos.filter(c => c.id !== id);
+            await saveCustomYtVideos(customVideos);
+            rebuildPlaylist(); renderGrid();
+          }
+        );
+        ytGrid.appendChild(card);
+      });
+
+      const divider = document.createElement('div');
+      divider.className = 'yt-section-hdr';
+      divider.innerHTML = '<span>BUILT-IN</span>';
+      ytGrid.appendChild(divider);
+    }
+
+    // Built-in videos
+    YT_VIDEOS.forEach(v => {
+      const card = buildYtCard(v.id, v.title, v.ch, false,
+        (id, t, ch) => playYtVideo(id, t, ch, iframe, titleEl, openLink, playerView, ytGrid, updateNowPlaying)
+      );
+      ytGrid.appendChild(card);
     });
-    ytGrid.appendChild(card);
+
+    rebuildPlaylist();
+  }
+
+  renderGrid();
+
+  // Add custom video form
+  const form = document.getElementById('yt-add-form') as HTMLFormElement;
+  const input = document.getElementById('yt-add-input') as HTMLInputElement;
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = parseYouTubeId(input.value);
+    if (!id) { input.classList.add('yt-add-error'); setTimeout(() => input.classList.remove('yt-add-error'), 1200); return; }
+    if (customVideos.some(v => v.id === id) || YT_VIDEOS.some(v => v.id === id)) { input.value = ''; return; }
+    const btn = form.querySelector('.yt-add-btn') as HTMLButtonElement;
+    btn.textContent = '…'; btn.disabled = true;
+    const title = await fetchYtTitle(id);
+    customVideos.push({ id, title, addedAt: Date.now() });
+    await saveCustomYtVideos(customVideos);
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add`;
+    btn.disabled = false;
+    input.value = '';
+    rebuildPlaylist(); renderGrid();
   });
 
   document.getElementById('btn-yt-back')?.addEventListener('click', () => {
@@ -704,6 +838,7 @@ function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
     ytGrid.classList.remove('hidden');
     iframe.src = '';
     updateNowPlaying(null);
+    activeYtIframe = null;
   });
 }
 
@@ -1119,29 +1254,65 @@ function initFocusMode() {
     });
   });
 
-  // Build FM YouTube grid
-  YT_VIDEOS.forEach(v => {
-    const card = document.createElement('div');
-    card.className = 'yt-card';
-    card.innerHTML = `
-      <div class="yt-thumb-wrap">
-        <img class="yt-thumb" src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="${v.title}" loading="lazy" />
-        <div class="yt-play-overlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
-      </div>
-      <div class="yt-card-info">
-        <span class="yt-card-title">${v.title}</span>
-        <span class="yt-card-ch">${v.ch}</span>
-      </div>`;
-    card.addEventListener('click', () => {
+  // Build FM YouTube grid (shared custom videos + built-in)
+  async function renderFmYtGrid() {
+    fmYtGrid.innerHTML = '';
+    const customVideos = await getCustomYtVideos();
+
+    function fmPlay(id: string, title: string, ch: string) {
       fmYtGrid.classList.add('hidden');
       fmYtPlayer.classList.remove('hidden');
-      fmYtTitle.textContent = `${v.title} · ${v.ch}`;
-      fmYtOpen.href = `https://www.youtube.com/watch?v=${v.id}`;
-      fmYtIframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
-      fmSoundInfo = { label: v.title, variantId: `yt-${v.id}` };
+      fmYtTitle.textContent = `${title} · ${ch}`;
+      fmYtOpen.href = `https://www.youtube.com/watch?v=${id}`;
+      fmYtIframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1`;
+      fmSoundInfo = { label: title, variantId: `yt-${id}` };
       updateFmSoundChip();
+      // Sync with shared playlist state
+      activeYtIframe = fmYtIframe; activeYtTitleEl = fmYtTitle;
+      activeYtOpenLink = fmYtOpen; activeYtUpdateFn = (label) => {
+        if (label) { fmSoundInfo = { label, variantId: `yt-active` }; updateFmSoundChip(); }
+      };
+      ytCurrentIdx = ytPlaylist.findIndex(v => v.id === id);
+    }
+
+    if (customVideos.length > 0) {
+      const hdr = document.createElement('div');
+      hdr.className = 'yt-section-hdr';
+      hdr.innerHTML = `<span>MY PLAYLIST <span class="yt-count">${customVideos.length}</span></span>`;
+      fmYtGrid.appendChild(hdr);
+      customVideos.slice().reverse().forEach(v => {
+        fmYtGrid.appendChild(buildYtCard(v.id, v.title, 'My Playlist', false, fmPlay));
+      });
+      const div = document.createElement('div');
+      div.className = 'yt-section-hdr';
+      div.innerHTML = '<span>BUILT-IN</span>';
+      fmYtGrid.appendChild(div);
+    }
+
+    YT_VIDEOS.forEach(v => {
+      fmYtGrid.appendChild(buildYtCard(v.id, v.title, v.ch, false, fmPlay));
     });
-    fmYtGrid.appendChild(card);
+  }
+  renderFmYtGrid();
+
+  // FM add form — adds to shared storage and refreshes both grids
+  const fmAddForm = document.getElementById('fm-yt-add-form') as HTMLFormElement;
+  const fmAddInput = document.getElementById('fm-yt-add-input') as HTMLInputElement;
+  fmAddForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = parseYouTubeId(fmAddInput.value);
+    if (!id) { fmAddInput.classList.add('yt-add-error'); setTimeout(() => fmAddInput.classList.remove('yt-add-error'), 1200); return; }
+    const existing = await getCustomYtVideos();
+    if (existing.some(v => v.id === id) || YT_VIDEOS.some(v => v.id === id)) { fmAddInput.value = ''; return; }
+    const btn = fmAddForm.querySelector('.yt-add-btn') as HTMLButtonElement;
+    btn.textContent = '…'; btn.disabled = true;
+    const title = await fetchYtTitle(id);
+    existing.push({ id, title, addedAt: Date.now() });
+    await saveCustomYtVideos(existing);
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add`;
+    btn.disabled = false;
+    fmAddInput.value = '';
+    renderFmYtGrid();
   });
 
   document.getElementById('fm-yt-back')?.addEventListener('click', () => {
@@ -1149,6 +1320,7 @@ function initFocusMode() {
     fmYtGrid.classList.remove('hidden');
     fmYtIframe.src = '';
     fmSoundInfo = null; updateFmSoundChip();
+    activeYtIframe = null;
   });
 
   // Focus mode task form

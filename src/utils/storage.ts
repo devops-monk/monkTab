@@ -72,6 +72,12 @@ export interface FocusDay {
   sessions: number;
 }
 
+export interface CustomYtVideo {
+  id: string;
+  title: string;
+  addedAt: number;
+}
+
 const DEFAULTS: Settings = {
   name: '',
   searchEngine: 'google',
@@ -192,6 +198,15 @@ function defaultLinks(): QuickLink[] {
     { id: '3', label: 'MonkKit', url: 'https://tools.devops-monk.com' },
     { id: '4', label: 'AWS', url: 'https://console.aws.amazon.com' },
   ];
+}
+
+export async function getCustomYtVideos(): Promise<CustomYtVideo[]> {
+  const result = await chrome.storage.local.get('mt_yt_custom');
+  return (result['mt_yt_custom'] as CustomYtVideo[]) ?? [];
+}
+
+export async function saveCustomYtVideos(videos: CustomYtVideo[]): Promise<void> {
+  await chrome.storage.local.set({ mt_yt_custom: videos });
 }
 
 export function todayString(): string {
