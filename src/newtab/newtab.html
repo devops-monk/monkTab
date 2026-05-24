@@ -605,26 +605,110 @@
             <div id="clocks-config" class="clocks-chips"></div>
             <select id="tz-preset" class="set-select" style="margin-top:12px">
               <option value="">＋ Add a city…</option>
-              <option value="London|Europe/London">🇬🇧 London</option>
-              <option value="New York|America/New_York">🇺🇸 New York</option>
-              <option value="Los Angeles|America/Los_Angeles">🇺🇸 Los Angeles</option>
-              <option value="Chicago|America/Chicago">🇺🇸 Chicago</option>
-              <option value="Toronto|America/Toronto">🇨🇦 Toronto</option>
-              <option value="São Paulo|America/Sao_Paulo">🇧🇷 São Paulo</option>
-              <option value="Paris|Europe/Paris">🇫🇷 Paris</option>
-              <option value="Berlin|Europe/Berlin">🇩🇪 Berlin</option>
-              <option value="Amsterdam|Europe/Amsterdam">🇳🇱 Amsterdam</option>
-              <option value="Dubai|Asia/Dubai">🇦🇪 Dubai</option>
-              <option value="Mumbai|Asia/Kolkata">🇮🇳 Mumbai / Delhi</option>
-              <option value="Singapore|Asia/Singapore">🇸🇬 Singapore</option>
-              <option value="Tokyo|Asia/Tokyo">🇯🇵 Tokyo</option>
-              <option value="Sydney|Australia/Sydney">🇦🇺 Sydney</option>
-              <option value="Auckland|Pacific/Auckland">🇳🇿 Auckland</option>
-              <option value="Beijing|Asia/Shanghai">🇨🇳 Beijing</option>
-              <option value="Seoul|Asia/Seoul">🇰🇷 Seoul</option>
-              <option value="Nairobi|Africa/Nairobi">🇰🇪 Nairobi</option>
-              <option value="Cairo|Africa/Cairo">🇪🇬 Cairo</option>
-              <option value="Lagos|Africa/Lagos">🇳🇬 Lagos</option>
+              <optgroup label="🌎 Americas">
+                <option value="New York|America/New_York">🇺🇸 New York</option>
+                <option value="Los Angeles|America/Los_Angeles">🇺🇸 Los Angeles</option>
+                <option value="Chicago|America/Chicago">🇺🇸 Chicago</option>
+                <option value="Miami|America/New_York">🇺🇸 Miami</option>
+                <option value="Seattle|America/Los_Angeles">🇺🇸 Seattle</option>
+                <option value="Denver|America/Denver">🇺🇸 Denver</option>
+                <option value="Phoenix|America/Phoenix">🇺🇸 Phoenix</option>
+                <option value="Honolulu|Pacific/Honolulu">🇺🇸 Honolulu</option>
+                <option value="Anchorage|America/Anchorage">🇺🇸 Anchorage</option>
+                <option value="Toronto|America/Toronto">🇨🇦 Toronto</option>
+                <option value="Vancouver|America/Vancouver">🇨🇦 Vancouver</option>
+                <option value="Montreal|America/Toronto">🇨🇦 Montreal</option>
+                <option value="Mexico City|America/Mexico_City">🇲🇽 Mexico City</option>
+                <option value="Bogotá|America/Bogota">🇨🇴 Bogotá</option>
+                <option value="Lima|America/Lima">🇵🇪 Lima</option>
+                <option value="Santiago|America/Santiago">🇨🇱 Santiago</option>
+                <option value="Buenos Aires|America/Argentina/Buenos_Aires">🇦🇷 Buenos Aires</option>
+                <option value="São Paulo|America/Sao_Paulo">🇧🇷 São Paulo</option>
+                <option value="Caracas|America/Caracas">🇻🇪 Caracas</option>
+              </optgroup>
+              <optgroup label="🌍 Europe">
+                <option value="London|Europe/London">🇬🇧 London</option>
+                <option value="Dublin|Europe/Dublin">🇮🇪 Dublin</option>
+                <option value="Lisbon|Europe/Lisbon">🇵🇹 Lisbon</option>
+                <option value="Madrid|Europe/Madrid">🇪🇸 Madrid</option>
+                <option value="Paris|Europe/Paris">🇫🇷 Paris</option>
+                <option value="Brussels|Europe/Brussels">🇧🇪 Brussels</option>
+                <option value="Amsterdam|Europe/Amsterdam">🇳🇱 Amsterdam</option>
+                <option value="Zurich|Europe/Zurich">🇨🇭 Zurich</option>
+                <option value="Berlin|Europe/Berlin">🇩🇪 Berlin</option>
+                <option value="Vienna|Europe/Vienna">🇦🇹 Vienna</option>
+                <option value="Prague|Europe/Prague">🇨🇿 Prague</option>
+                <option value="Warsaw|Europe/Warsaw">🇵🇱 Warsaw</option>
+                <option value="Stockholm|Europe/Stockholm">🇸🇪 Stockholm</option>
+                <option value="Oslo|Europe/Oslo">🇳🇴 Oslo</option>
+                <option value="Copenhagen|Europe/Copenhagen">🇩🇰 Copenhagen</option>
+                <option value="Helsinki|Europe/Helsinki">🇫🇮 Helsinki</option>
+                <option value="Rome|Europe/Rome">🇮🇹 Rome</option>
+                <option value="Athens|Europe/Athens">🇬🇷 Athens</option>
+                <option value="Istanbul|Europe/Istanbul">🇹🇷 Istanbul</option>
+                <option value="Kyiv|Europe/Kyiv">🇺🇦 Kyiv</option>
+                <option value="Moscow|Europe/Moscow">🇷🇺 Moscow</option>
+                <option value="Budapest|Europe/Budapest">🇭🇺 Budapest</option>
+              </optgroup>
+              <optgroup label="🌍 Africa">
+                <option value="Cairo|Africa/Cairo">🇪🇬 Cairo</option>
+                <option value="Lagos|Africa/Lagos">🇳🇬 Lagos</option>
+                <option value="Nairobi|Africa/Nairobi">🇰🇪 Nairobi</option>
+                <option value="Johannesburg|Africa/Johannesburg">🇿🇦 Johannesburg</option>
+                <option value="Casablanca|Africa/Casablanca">🇲🇦 Casablanca</option>
+                <option value="Accra|Africa/Accra">🇬🇭 Accra</option>
+                <option value="Addis Ababa|Africa/Addis_Ababa">🇪🇹 Addis Ababa</option>
+                <option value="Dar es Salaam|Africa/Dar_es_Salaam">🇹🇿 Dar es Salaam</option>
+                <option value="Dakar|Africa/Dakar">🇸🇳 Dakar</option>
+              </optgroup>
+              <optgroup label="🌏 Middle East">
+                <option value="Dubai|Asia/Dubai">🇦🇪 Dubai</option>
+                <option value="Abu Dhabi|Asia/Dubai">🇦🇪 Abu Dhabi</option>
+                <option value="Riyadh|Asia/Riyadh">🇸🇦 Riyadh</option>
+                <option value="Doha|Asia/Qatar">🇶🇦 Doha</option>
+                <option value="Kuwait City|Asia/Kuwait">🇰🇼 Kuwait City</option>
+                <option value="Tel Aviv|Asia/Jerusalem">🇮🇱 Tel Aviv</option>
+                <option value="Baghdad|Asia/Baghdad">🇮🇶 Baghdad</option>
+                <option value="Tehran|Asia/Tehran">🇮🇷 Tehran</option>
+              </optgroup>
+              <optgroup label="🌏 South &amp; Central Asia">
+                <option value="Karachi|Asia/Karachi">🇵🇰 Karachi</option>
+                <option value="Mumbai|Asia/Kolkata">🇮🇳 Mumbai</option>
+                <option value="Delhi|Asia/Kolkata">🇮🇳 Delhi</option>
+                <option value="Kolkata|Asia/Kolkata">🇮🇳 Kolkata</option>
+                <option value="Bangalore|Asia/Kolkata">🇮🇳 Bangalore</option>
+                <option value="Dhaka|Asia/Dhaka">🇧🇩 Dhaka</option>
+                <option value="Kathmandu|Asia/Kathmandu">🇳🇵 Kathmandu</option>
+                <option value="Colombo|Asia/Colombo">🇱🇰 Colombo</option>
+                <option value="Tashkent|Asia/Tashkent">🇺🇿 Tashkent</option>
+                <option value="Almaty|Asia/Almaty">🇰🇿 Almaty</option>
+              </optgroup>
+              <optgroup label="🌏 East &amp; South-East Asia">
+                <option value="Yangon|Asia/Rangoon">🇲🇲 Yangon</option>
+                <option value="Bangkok|Asia/Bangkok">🇹🇭 Bangkok</option>
+                <option value="Jakarta|Asia/Jakarta">🇮🇩 Jakarta</option>
+                <option value="Kuala Lumpur|Asia/Kuala_Lumpur">🇲🇾 Kuala Lumpur</option>
+                <option value="Singapore|Asia/Singapore">🇸🇬 Singapore</option>
+                <option value="Manila|Asia/Manila">🇵🇭 Manila</option>
+                <option value="Hong Kong|Asia/Hong_Kong">🇭🇰 Hong Kong</option>
+                <option value="Taipei|Asia/Taipei">🇹🇼 Taipei</option>
+                <option value="Beijing|Asia/Shanghai">🇨🇳 Beijing</option>
+                <option value="Shanghai|Asia/Shanghai">🇨🇳 Shanghai</option>
+                <option value="Seoul|Asia/Seoul">🇰🇷 Seoul</option>
+                <option value="Tokyo|Asia/Tokyo">🇯🇵 Tokyo</option>
+                <option value="Osaka|Asia/Tokyo">🇯🇵 Osaka</option>
+                <option value="Ulaanbaatar|Asia/Ulaanbaatar">🇲🇳 Ulaanbaatar</option>
+                <option value="Vladivostok|Asia/Vladivostok">🇷🇺 Vladivostok</option>
+              </optgroup>
+              <optgroup label="🌏 Oceania">
+                <option value="Sydney|Australia/Sydney">🇦🇺 Sydney</option>
+                <option value="Melbourne|Australia/Melbourne">🇦🇺 Melbourne</option>
+                <option value="Brisbane|Australia/Brisbane">🇦🇺 Brisbane</option>
+                <option value="Perth|Australia/Perth">🇦🇺 Perth</option>
+                <option value="Auckland|Pacific/Auckland">🇳🇿 Auckland</option>
+                <option value="Suva|Pacific/Fiji">🇫🇯 Suva (Fiji)</option>
+                <option value="Guam|Pacific/Guam">🇬🇺 Guam</option>
+              </optgroup>
             </select>
           </div>
         </section>
