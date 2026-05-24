@@ -150,15 +150,18 @@ let todos: Todo[] = [];
 function renderTodos() {
   const list = document.getElementById('todo-list') as HTMLUListElement;
   list.innerHTML = '';
+  if (todos.length === 0) {
+    list.innerHTML = '<li class="todo-empty">No tasks yet — add one below</li>';
+    return;
+  }
   todos.forEach((todo) => {
     const li = document.createElement('li');
     li.className = `todo-item${todo.done ? ' done' : ''}`;
 
-    const check = document.createElement('button');
-    check.className = 'todo-check';
-    check.innerHTML = `<svg class="todo-check-svg" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 5 9 10 3"/></svg>`;
-    check.addEventListener('click', () => {
-      todo.done = !todo.done;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'todo-cb'; cb.checked = todo.done;
+    cb.addEventListener('change', () => {
+      todo.done = cb.checked;
       saveTodos(todos);
       li.classList.toggle('done', todo.done);
       updatePomoTask();
@@ -171,7 +174,7 @@ function renderTodos() {
     del.className = 'del-btn'; del.textContent = '✕';
     del.addEventListener('click', () => { todos = todos.filter(t => t.id !== todo.id); saveTodos(todos); renderTodos(); });
 
-    li.append(check, span, del);
+    li.append(cb, span, del);
     list.appendChild(li);
   });
 }
@@ -515,19 +518,20 @@ function initSoundscapes() {
 
 // ─── YouTube Beats ────────────────────────────────────────────────────────────
 
+// All videos verified embeddable (youtube-nocookie.com)
 const YT_VIDEOS = [
-  { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio' },
-  { id: '4xDzrJKXOOY', title: 'Synthwave Radio' },
-  { id: 'DWcJFNfaw9c', title: 'Brown Noise · 8 Hours' },
-  { id: 'HuFYqnbVbzY', title: 'Classical Music for Studying' },
-  { id: 'lTRiuFIWV54', title: 'Deep Focus Music' },
-  { id: 'sjkrrmBnpGE', title: 'Jazz & Bossa Nova Radio' },
-  { id: '5qap5aO4i9A', title: 'Chillhop Radio' },
-  { id: '36YnV9STBqc', title: 'Piano for Studying' },
-  { id: '21qNxnCS8WU', title: 'Coffee Shop Ambience' },
-  { id: 'rUxyKA_-grg', title: 'Peaceful Piano' },
-  { id: 'MVPTGNGiI-4', title: 'Chill Beats to Study' },
-  { id: 'n61ULEU7CO0', title: 'Nature Sounds for Focus' },
+  { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio',       ch: 'Lofi Girl' },
+  { id: '4xDzrJKXOOY', title: 'Synthwave Radio',           ch: 'Lofi Girl' },
+  { id: 'Na0w3Mz46GA', title: 'Lofi Chill Beats',         ch: 'Lofi Girl' },
+  { id: 'lCOF9LVlRks', title: 'Dark Academia Playlist',   ch: 'Lofi Girl' },
+  { id: 'DWcJFNfaw9c', title: 'Brown Noise · 8h',         ch: 'Relaxing White Noise' },
+  { id: 'lTRiuFIWV54', title: 'Deep Focus Music',         ch: 'Greenred Productions' },
+  { id: 'WPni755-Krg', title: 'Classical Focus',          ch: 'Lofi Girl' },
+  { id: '36YnV9STBqc', title: 'Piano for Studying',       ch: 'Soothing Relaxation' },
+  { id: 'sjkrrmBnpGE', title: 'Jazz & Bossa Nova',        ch: 'Lofi Jazz' },
+  { id: 'rUxyKA_-grg', title: 'Peaceful Piano',           ch: 'Soothing Relaxation' },
+  { id: '2gliGzb2_1I', title: 'Coffee Shop Ambience',    ch: 'Ambient Sounds' },
+  { id: 'qYnA9wWFHLI', title: 'Forest Rain · 3h',        ch: 'Nature Soundscapes' },
 ];
 
 function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
@@ -549,8 +553,18 @@ function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
     card.addEventListener('click', () => {
       ytGrid.classList.add('hidden');
       playerView.classList.remove('hidden');
-      titleEl.textContent = v.title;
+      titleEl.textContent = `${v.title} · ${v.ch}`;
       iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
+      // Fallback if embedding blocked
+      const fallback = document.getElementById('yt-fallback') as HTMLElement;
+      if (fallback) {
+        fallback.classList.add('hidden');
+        fallback.querySelector('a')?.setAttribute('href', `https://www.youtube.com/watch?v=${v.id}`);
+      }
+      iframe.onload = () => {
+        // Can't detect Error 153 from JS cross-origin, so show fallback link always
+        if (fallback) fallback.classList.remove('hidden');
+      };
       updateNowPlaying(v.title);
     });
     ytGrid.appendChild(card);
