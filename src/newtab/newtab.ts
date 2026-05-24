@@ -1,6 +1,7 @@
 import {
   getSettings, saveSettings, getDaily, saveDaily, getTodos, saveTodos,
   getLinks, saveLinks, getNotes, saveNotes, getCountdowns, saveCountdowns,
+  getFocusHistory, logFocusSession,
   todayString, type Todo, type QuickLink, type Countdown, type WorldClock, type Settings,
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
@@ -78,11 +79,31 @@ function initQuoteRefresh() {
 async function loadWeather() {
   const w = await fetchWeather();
   if (!w) return;
+
+  // Topbar badge
   const widget = document.getElementById('weather-widget') as HTMLElement;
   (document.getElementById('weather-icon') as HTMLElement).textContent = w.icon;
-  (document.getElementById('weather-temp') as HTMLElement).textContent = `${w.temp}°C`;
+  (document.getElementById('weather-temp') as HTMLElement).textContent = `${w.temp}°`;
   (document.getElementById('weather-city') as HTMLElement).textContent = w.city;
   widget.classList.remove('hidden');
+
+  // Expanded card fields
+  (document.getElementById('wc-city') as HTMLElement).textContent = w.city;
+  (document.getElementById('wc-condition') as HTMLElement).textContent = w.condition;
+  (document.getElementById('wc-icon') as HTMLElement).textContent = w.icon;
+  (document.getElementById('wc-temp') as HTMLElement).textContent = `${w.temp}°`;
+  (document.getElementById('wc-feels') as HTMLElement).textContent = `${w.feelsLike ?? w.temp}°C`;
+  (document.getElementById('wc-wind') as HTMLElement).textContent = `${w.windSpeed ?? '--'} km/h`;
+  (document.getElementById('wc-rain') as HTMLElement).textContent = `${w.precipitation ?? 0} mm`;
+
+  // Toggle expanded card on click
+  const card = document.getElementById('weather-card') as HTMLElement;
+  widget.addEventListener('click', (e) => {
+    e.stopPropagation();
+    card.classList.toggle('hidden');
+  });
+  document.addEventListener('click', () => card.classList.add('hidden'));
+  card.addEventListener('click', e => e.stopPropagation());
 }
 
 // ─── World Clocks ─────────────────────────────────────────────────────────────
@@ -603,12 +624,17 @@ function initPomodoro() {
     if (pomoRunning) {
       clearInterval(pomoInterval!); pomoInterval = null; pomoRunning = false;
     } else {
+      const sessionDuration = POMO_DURATIONS[pomoMode];
       pomoRunning = true;
-      pomoInterval = setInterval(() => {
+      pomoInterval = setInterval(async () => {
         pomoSecondsLeft--;
         renderPomo();
         if (pomoSecondsLeft <= 0) {
           clearInterval(pomoInterval!); pomoInterval = null; pomoRunning = false;
+          if (pomoMode === 'focus') {
+            await logFocusSession(Math.round(sessionDuration / 60));
+            renderFocusStats();
+          }
           chrome.notifications?.create({
             type: 'basic', iconUrl: '/icons/icon48.png', title: 'MonkTab',
             message: pomoMode === 'focus' ? 'Focus session done! Take a break.' : 'Break over — back to it!',
@@ -629,6 +655,18 @@ function initPomodoro() {
     renderPomo();
   });
 
+  // Stats / Timer tab switching
+  document.querySelectorAll<HTMLButtonElement>('.pomo-header-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pomo-header-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const isStats = btn.dataset['ptab'] === 'stats';
+      document.getElementById('pomo-timer-view')?.classList.toggle('hidden', isStats);
+      document.getElementById('pomo-stats-view')?.classList.toggle('hidden', !isStats);
+      if (isStats) renderFocusStats();
+    });
+  });
+
   document.getElementById('btn-pomo-toggle')?.addEventListener('click', () => {
     const panel = document.getElementById('pomodoro-panel') as HTMLElement;
     panel.classList.toggle('hidden');
@@ -636,6 +674,59 @@ function initPomodoro() {
   });
 
   renderPomo();
+}
+
+async function renderFocusStats() {
+  const history = await getFocusHistory();
+  const today = todayString();
+
+  // Build last-7-days array
+  const days: { label: string; date: string; minutes: number; sessions: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const entry = history.find(h => h.date === dateStr);
+    days.push({ label: ['S','M','T','W','T','F','S'][d.getDay()], date: dateStr, minutes: entry?.minutes ?? 0, sessions: entry?.sessions ?? 0 });
+  }
+
+  const todayEntry = history.find(h => h.date === today);
+  const todayMins = todayEntry?.minutes ?? 0;
+  const todaySessions = todayEntry?.sessions ?? 0;
+
+  // Format today
+  const todayLabel = todayMins >= 60
+    ? `${Math.floor(todayMins / 60)}h ${todayMins % 60}m`
+    : `${todayMins}m`;
+  (document.getElementById('stat-today-mins') as HTMLElement).textContent = todayLabel || '0m';
+  (document.getElementById('stat-sessions') as HTMLElement).textContent = String(todaySessions);
+
+  // Tasks done today
+  const doneTasks = todos.filter(t => t.done).length;
+  (document.getElementById('stat-tasks-done') as HTMLElement).textContent = String(doneTasks);
+
+  // Streak: consecutive days with at least 1 session
+  let streak = 0;
+  const sortedHistory = [...history].sort((a, b) => b.date.localeCompare(a.date));
+  for (const entry of sortedHistory) {
+    if (entry.sessions > 0) streak++;
+    else break;
+  }
+  (document.getElementById('stat-streak') as HTMLElement).textContent = String(streak);
+
+  // Bar chart
+  const chart = document.getElementById('focus-chart') as HTMLElement;
+  const maxMins = Math.max(...days.map(d => d.minutes), 30);
+  chart.innerHTML = days.map(d => {
+    const pct = Math.round((d.minutes / maxMins) * 100);
+    const isToday = d.date === today;
+    return `<div class="fc-col">
+      <div class="fc-bar-wrap">
+        <div class="fc-bar${isToday ? ' fc-bar-today' : ''}" style="height:${Math.max(pct, d.minutes > 0 ? 8 : 2)}%"
+          title="${d.minutes}m"></div>
+      </div>
+      <span class="fc-day${isToday ? ' fc-day-today' : ''}">${d.label}</span>
+    </div>`;
+  }).join('');
 }
 
 // ─── Vision Board (custom backgrounds) ───────────────────────────────────────

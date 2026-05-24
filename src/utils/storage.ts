@@ -56,10 +56,19 @@ export interface DailyState {
 
 export interface WeatherCache {
   temp: number;
+  feelsLike: number;
+  windSpeed: number;
+  precipitation: number;
   condition: string;
   icon: string;
   city: string;
   cachedAt: number;
+}
+
+export interface FocusDay {
+  date: string;   // YYYY-MM-DD
+  minutes: number;
+  sessions: number;
 }
 
 const DEFAULTS: Settings = {
@@ -153,6 +162,26 @@ export async function getCountdowns(): Promise<Countdown[]> {
 
 export async function saveCountdowns(items: Countdown[]): Promise<void> {
   await chrome.storage.local.set({ mt_countdowns: items });
+}
+
+export async function getFocusHistory(): Promise<FocusDay[]> {
+  const result = await chrome.storage.local.get('mt_focus_history');
+  return (result['mt_focus_history'] as FocusDay[]) ?? [];
+}
+
+export async function logFocusSession(minutes: number): Promise<void> {
+  const history = await getFocusHistory();
+  const today = todayString();
+  const existing = history.find(d => d.date === today);
+  if (existing) {
+    existing.minutes += minutes;
+    existing.sessions += 1;
+  } else {
+    history.push({ date: today, minutes, sessions: 1 });
+  }
+  // Keep only last 30 days
+  const recent = history.sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+  await chrome.storage.local.set({ mt_focus_history: recent });
 }
 
 function defaultLinks(): QuickLink[] {

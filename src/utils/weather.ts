@@ -46,18 +46,29 @@ export async function fetchWeather(): Promise<WeatherCache | null> {
           const a = geoData.address ?? {};
           const city = a.city ?? a.town ?? a.village ?? a.county ?? 'Your location';
 
-          // Weather
+          // Weather — fetch extra fields for expanded card
           const wxRes = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=celsius`
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+            `&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code` +
+            `&wind_speed_unit=kmh&temperature_unit=celsius`
           );
           const wxData = await wxRes.json() as {
-            current_weather: { temperature: number; weathercode: number };
+            current: {
+              temperature_2m: number;
+              apparent_temperature: number;
+              precipitation: number;
+              wind_speed_10m: number;
+              weather_code: number;
+            };
           };
-          const { temperature, weathercode } = wxData.current_weather;
-          const { label, icon } = getCondition(weathercode);
+          const c = wxData.current;
+          const { label, icon } = getCondition(c.weather_code);
 
           const w: WeatherCache = {
-            temp: Math.round(temperature),
+            temp: Math.round(c.temperature_2m),
+            feelsLike: Math.round(c.apparent_temperature),
+            windSpeed: Math.round(c.wind_speed_10m),
+            precipitation: Math.round(c.precipitation * 10) / 10,
             condition: label,
             icon,
             city,
