@@ -70,7 +70,12 @@
 
     <div id="quote-wrap" class="quote-wrap">
       <p id="quote-text" class="quote-text"></p>
-      <p id="quote-author" class="quote-author"></p>
+      <div class="quote-footer">
+        <p id="quote-author" class="quote-author"></p>
+        <button id="btn-quote-refresh" class="quote-refresh-btn" title="New quote">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- Countdowns (inline, below quote) -->
@@ -175,6 +180,23 @@
     <div id="sound-grid" class="sound-grid"></div>
   </div>
 
+  <!-- Onboarding modal -->
+  <div id="onboarding-modal" class="modal-backdrop hidden">
+    <div class="modal onboarding-modal">
+      <div class="onboarding-logo">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="10" fill="rgba(167,139,250,0.15)"/><circle cx="18" cy="18" r="10" stroke="#a78bfa" stroke-width="1.5" fill="none"/><path d="M18 12v6l4 2" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <h2 class="onboarding-title">Welcome to MonkTab</h2>
+      <p class="onboarding-sub">Your focused start. Every tab.</p>
+      <div class="onboarding-field">
+        <label class="onboarding-label">What's your name?</label>
+        <input id="onboarding-name" class="onboarding-input" type="text" placeholder="e.g. Abhay" maxlength="30" autocomplete="given-name" />
+      </div>
+      <button id="btn-onboarding-done" class="onboarding-btn">Get started →</button>
+      <p class="onboarding-privacy">Everything stays on your device. No account needed.</p>
+    </div>
+  </div>
+
   <!-- Ask AI modal -->
   <div id="ai-modal" class="modal-backdrop hidden">
     <div class="modal">
@@ -273,31 +295,30 @@
       </label>
 
       <div class="settings-section">World Clocks</div>
-      <div id="clocks-config" class="clocks-config"></div>
-      <select id="tz-preset" class="setting-row" style="margin-top:4px">
-        <option value="">— Quick add a city —</option>
-        <option value="London|Europe/London">London</option>
-        <option value="New York|America/New_York">New York</option>
-        <option value="Los Angeles|America/Los_Angeles">Los Angeles</option>
-        <option value="Chicago|America/Chicago">Chicago</option>
-        <option value="Toronto|America/Toronto">Toronto</option>
-        <option value="São Paulo|America/Sao_Paulo">São Paulo</option>
-        <option value="Paris|Europe/Paris">Paris</option>
-        <option value="Berlin|Europe/Berlin">Berlin</option>
-        <option value="Amsterdam|Europe/Amsterdam">Amsterdam</option>
-        <option value="Dubai|Asia/Dubai">Dubai</option>
-        <option value="Mumbai|Asia/Kolkata">Mumbai / IST</option>
-        <option value="Singapore|Asia/Singapore">Singapore</option>
-        <option value="Tokyo|Asia/Tokyo">Tokyo</option>
-        <option value="Sydney|Australia/Sydney">Sydney</option>
-        <option value="Auckland|Pacific/Auckland">Auckland</option>
-        <option value="Beijing|Asia/Shanghai">Beijing / Shanghai</option>
-        <option value="Seoul|Asia/Seoul">Seoul</option>
-        <option value="Nairobi|Africa/Nairobi">Nairobi</option>
-        <option value="Cairo|Africa/Cairo">Cairo</option>
-        <option value="Lagos|Africa/Lagos">Lagos</option>
+      <div id="clocks-config" class="clocks-chips"></div>
+      <select id="tz-preset" class="setting-select" style="margin-top:4px">
+        <option value="">＋ Add a city…</option>
+        <option value="London|Europe/London">🇬🇧 London</option>
+        <option value="New York|America/New_York">🇺🇸 New York</option>
+        <option value="Los Angeles|America/Los_Angeles">🇺🇸 Los Angeles</option>
+        <option value="Chicago|America/Chicago">🇺🇸 Chicago</option>
+        <option value="Toronto|America/Toronto">🇨🇦 Toronto</option>
+        <option value="São Paulo|America/Sao_Paulo">🇧🇷 São Paulo</option>
+        <option value="Paris|Europe/Paris">🇫🇷 Paris</option>
+        <option value="Berlin|Europe/Berlin">🇩🇪 Berlin</option>
+        <option value="Amsterdam|Europe/Amsterdam">🇳🇱 Amsterdam</option>
+        <option value="Dubai|Asia/Dubai">🇦🇪 Dubai</option>
+        <option value="Mumbai|Asia/Kolkata">🇮🇳 Mumbai / Delhi</option>
+        <option value="Singapore|Asia/Singapore">🇸🇬 Singapore</option>
+        <option value="Tokyo|Asia/Tokyo">🇯🇵 Tokyo</option>
+        <option value="Sydney|Australia/Sydney">🇦🇺 Sydney</option>
+        <option value="Auckland|Pacific/Auckland">🇳🇿 Auckland</option>
+        <option value="Beijing|Asia/Shanghai">🇨🇳 Beijing</option>
+        <option value="Seoul|Asia/Seoul">🇰🇷 Seoul</option>
+        <option value="Nairobi|Africa/Nairobi">🇰🇪 Nairobi</option>
+        <option value="Cairo|Africa/Cairo">🇪🇬 Cairo</option>
+        <option value="Lagos|Africa/Lagos">🇳🇬 Lagos</option>
       </select>
-      <button id="btn-add-clock" class="add-row-btn">+ Add custom clock</button>
 
       <div class="settings-section">AI</div>
       <label class="setting-row">

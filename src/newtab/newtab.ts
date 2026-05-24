@@ -5,7 +5,7 @@ import {
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
 import { getBackground } from '../utils/background';
-import { getQuote } from '../utils/quotes';
+import { getQuote, getRandomQuote } from '../utils/quotes';
 import { fetchOpenPRs, timeAgo } from '../utils/github';
 import { SOUNDSCAPES, playSoundscape, stopSoundscape, setSoundVolume } from '../utils/soundscapes';
 
@@ -48,10 +48,29 @@ async function loadBackground(settings: Settings) {
 
 // ─── Quote ────────────────────────────────────────────────────────────────────
 
+function setQuote(quote: string, author: string) {
+  const textEl = document.getElementById('quote-text') as HTMLElement;
+  const authorEl = document.getElementById('quote-author') as HTMLElement;
+  textEl.style.opacity = '0';
+  authorEl.style.opacity = '0';
+  setTimeout(() => {
+    textEl.textContent = `"${quote}"`;
+    authorEl.textContent = `— ${author}`;
+    textEl.style.opacity = '1';
+    authorEl.style.opacity = '1';
+  }, 180);
+}
+
 async function loadQuote() {
   const { quote, author } = await getQuote();
-  (document.getElementById('quote-text') as HTMLElement).textContent = `"${quote}"`;
-  (document.getElementById('quote-author') as HTMLElement).textContent = `— ${author}`;
+  setQuote(quote, author);
+}
+
+function initQuoteRefresh() {
+  document.getElementById('btn-quote-refresh')?.addEventListener('click', () => {
+    const { quote, author } = getRandomQuote();
+    setQuote(quote, author);
+  });
 }
 
 // ─── Weather ──────────────────────────────────────────────────────────────────
@@ -113,19 +132,25 @@ function renderTodos() {
   todos.forEach((todo) => {
     const li = document.createElement('li');
     li.className = `todo-item${todo.done ? ' done' : ''}`;
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = todo.done;
-    cb.addEventListener('change', () => {
-      todo.done = cb.checked; saveTodos(todos);
+
+    const check = document.createElement('button');
+    check.className = 'todo-check';
+    check.innerHTML = `<svg class="todo-check-svg" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 5 9 10 3"/></svg>`;
+    check.addEventListener('click', () => {
+      todo.done = !todo.done;
+      saveTodos(todos);
       li.classList.toggle('done', todo.done);
       updatePomoTask();
     });
+
     const span = document.createElement('span');
     span.textContent = todo.text;
+
     const del = document.createElement('button');
     del.className = 'del-btn'; del.textContent = '✕';
     del.addEventListener('click', () => { todos = todos.filter(t => t.id !== todo.id); saveTodos(todos); renderTodos(); });
-    li.append(cb, span, del);
+
+    li.append(check, span, del);
     list.appendChild(li);
   });
 }
@@ -589,20 +614,21 @@ function initVisionBoard(settings: Settings) {
 function renderClocksConfig(clocks: WorldClock[]) {
   const container = document.getElementById('clocks-config') as HTMLElement;
   container.innerHTML = '';
+  if (clocks.length === 0) {
+    container.innerHTML = '<p class="clocks-empty">No clocks added yet. Pick a city below.</p>';
+    return;
+  }
   clocks.forEach((c, i) => {
-    const row = document.createElement('div');
-    row.className = 'clock-config-row';
-    const labelInput = document.createElement('input');
-    labelInput.placeholder = 'City'; labelInput.value = c.label;
-    labelInput.addEventListener('input', () => { clocks[i].label = labelInput.value; });
-    const tzInput = document.createElement('input');
-    tzInput.placeholder = 'Timezone (e.g. America/New_York)'; tzInput.value = c.timezone;
-    tzInput.addEventListener('input', () => { clocks[i].timezone = tzInput.value; });
+    const chip = document.createElement('div');
+    chip.className = 'clock-chip';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'clock-chip-label';
+    nameEl.textContent = c.label;
     const del = document.createElement('button');
-    del.className = 'icon-btn-sm'; del.textContent = '✕';
+    del.className = 'clock-chip-del'; del.textContent = '✕';
     del.addEventListener('click', () => { clocks.splice(i, 1); renderClocksConfig(clocks); });
-    row.append(labelInput, tzInput, del);
-    container.appendChild(row);
+    chip.append(nameEl, del);
+    container.appendChild(chip);
   });
 }
 
@@ -647,11 +673,6 @@ function initSettingsPanel(settings: Settings) {
       renderClocksConfig(clonedClocks);
     }
     (e.target as HTMLSelectElement).value = '';
-  });
-
-  document.getElementById('btn-add-clock')?.addEventListener('click', () => {
-    clonedClocks.push({ label: '', timezone: '' });
-    renderClocksConfig(clonedClocks);
   });
 
   initVisionBoard(settings);
@@ -713,8 +734,33 @@ function applyVisibility(s: Settings) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+async function showOnboarding(): Promise<string> {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('onboarding-modal') as HTMLElement;
+    const input = document.getElementById('onboarding-name') as HTMLInputElement;
+    const btn = document.getElementById('btn-onboarding-done') as HTMLButtonElement;
+    modal.classList.remove('hidden');
+    setTimeout(() => input.focus(), 100);
+    const done = async () => {
+      const name = input.value.trim();
+      await saveSettings({ name });
+      modal.classList.add('hidden');
+      resolve(name);
+    };
+    btn.addEventListener('click', done);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(); });
+  });
+}
+
 async function init() {
-  const settings = await getSettings();
+  let settings = await getSettings();
+
+  // Show onboarding on first install (no name set and never onboarded)
+  if (!settings.name) {
+    const name = await showOnboarding();
+    settings = await getSettings();
+    settings.name = name;
+  }
 
   applyTheme(settings.theme);
   (document.getElementById('greeting') as HTMLElement).textContent = greeting(settings.name);
@@ -728,6 +774,7 @@ async function init() {
   await initCountdowns();
   initBookmarkImport();
   initPomodoro();
+  initQuoteRefresh();
   initAI(settings.aiProvider);
   initSoundscapes();
 

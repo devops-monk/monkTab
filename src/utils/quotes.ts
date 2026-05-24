@@ -20,6 +20,12 @@ function todayIndex(): number {
   return (d.getFullYear() * 366 + d.getMonth() * 31 + d.getDate()) % FALLBACK_QUOTES.length;
 }
 
+export function getRandomQuote(): { quote: string; author: string } {
+  const idx = Math.floor(Math.random() * FALLBACK_QUOTES.length);
+  const q = FALLBACK_QUOTES[idx];
+  return { quote: q.q, author: q.a };
+}
+
 export async function getQuote(): Promise<{ quote: string; author: string }> {
   const daily = await getDaily();
   if (daily?.date === todayString() && daily.quote) {
