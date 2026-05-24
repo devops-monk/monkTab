@@ -571,15 +571,10 @@ function initSoundscapes() {
       grid.classList.toggle('hidden', isYt);
       ytSection.classList.toggle('hidden', !isYt);
       if (!isYt) {
-        // Stop YouTube when switching back
-        const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
-        iframe.src = '';
-        document.getElementById('yt-player-view')?.classList.add('hidden');
-        document.getElementById('yt-grid')?.classList.remove('hidden');
         updateNowPlaying(activeId ? SOUNDSCAPES.find(s => s.id === activeId)?.label ?? null : null);
       } else {
-        // Stop soundscape when switching to YouTube
         stopSoundscape(); activeId = null;
+        fmSoundInfo = null;
         grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
         updateNowPlaying(null);
       }
@@ -596,9 +591,8 @@ function initSoundscapes() {
     panel.classList.add('hidden');
     stopSoundscape();
     activeId = null;
+    fmSoundInfo = null;
     grid.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
-    const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
-    iframe.src = '';
     updateNowPlaying(null);
   });
 }
@@ -623,46 +617,29 @@ const YT_VIDEOS = [
 
 function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
   const ytGrid = document.getElementById('yt-grid') as HTMLElement;
-  const playerView = document.getElementById('yt-player-view') as HTMLElement;
-  const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
-  const titleEl = document.getElementById('yt-player-title') as HTMLElement;
 
   YT_VIDEOS.forEach(v => {
-    const card = document.createElement('div');
+    const card = document.createElement('a');
     card.className = 'yt-card';
+    card.href = `https://www.youtube.com/watch?v=${v.id}`;
+    card.target = '_blank';
+    card.rel = 'noopener noreferrer';
+    card.title = `${v.title} — opens in YouTube`;
     card.innerHTML = `
       <div class="yt-thumb-wrap">
         <img class="yt-thumb" src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" alt="${v.title}" loading="lazy" />
-        <div class="yt-play-overlay"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+        <div class="yt-play-overlay">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+        <span class="yt-ext-badge">↗</span>
       </div>
-      <span class="yt-card-title">${v.title}</span>
+      <div class="yt-card-info">
+        <span class="yt-card-title">${v.title}</span>
+        <span class="yt-card-ch">${v.ch}</span>
+      </div>
     `;
-    card.addEventListener('click', () => {
-      ytGrid.classList.add('hidden');
-      playerView.classList.remove('hidden');
-      titleEl.textContent = `${v.title} · ${v.ch}`;
-      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
-      iframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`;
-      // Fallback if embedding blocked
-      const fallback = document.getElementById('yt-fallback') as HTMLElement;
-      if (fallback) {
-        fallback.classList.add('hidden');
-        fallback.querySelector('a')?.setAttribute('href', `https://www.youtube.com/watch?v=${v.id}`);
-      }
-      iframe.onload = () => {
-        // Can't detect Error 153 from JS cross-origin, so show fallback link always
-        if (fallback) fallback.classList.remove('hidden');
-      };
-      updateNowPlaying(v.title);
-    });
+    card.addEventListener('click', () => updateNowPlaying(v.title));
     ytGrid.appendChild(card);
-  });
-
-  document.getElementById('btn-yt-back')?.addEventListener('click', () => {
-    playerView.classList.add('hidden');
-    ytGrid.classList.remove('hidden');
-    iframe.src = '';
-    updateNowPlaying(null);
   });
 }
 

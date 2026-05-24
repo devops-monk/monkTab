@@ -290,32 +290,13 @@
     <!-- Soundscapes grid -->
     <div id="sound-grid" class="sound-grid"></div>
 
-    <!-- YouTube section -->
+    <!-- YouTube section — opens in new tab (embedding blocked by YouTube for extensions) -->
     <div id="yt-section" class="yt-section hidden">
-      <!-- Video grid -->
+      <p class="yt-hint">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="color:#f87171;flex-shrink:0"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6a3 3 0 0 0-2.1 2.1C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+        Opens in a new tab — YouTube blocks embedding in extensions
+      </p>
       <div id="yt-grid" class="yt-grid"></div>
-      <!-- Player view -->
-      <div id="yt-player-view" class="yt-player-view hidden">
-        <div class="yt-player-header">
-          <button id="btn-yt-back" class="yt-back-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-            Back
-          </button>
-          <span id="yt-player-title" class="yt-player-title"></span>
-        </div>
-        <div class="yt-iframe-wrap">
-          <iframe id="yt-iframe" class="yt-iframe" frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            referrerpolicy="strict-origin-when-cross-origin"
-            allowfullscreen></iframe>
-        </div>
-        <div id="yt-fallback" class="yt-fallback hidden">
-          <a target="_blank" rel="noopener" class="yt-fallback-link">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6a3 3 0 0 0-2.1 2.1C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
-            Open in YouTube ↗
-          </a>
-        </div>
-      </div>
     </div>
   </div>
 
