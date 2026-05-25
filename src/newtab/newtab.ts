@@ -128,6 +128,43 @@ async function loadWeather(locationOverride = '') {
 
 // ─── World Clocks ─────────────────────────────────────────────────────────────
 
+// Cache city temperatures (30 min TTL) — keyed by city label
+const cityTempCache = new Map<string, { temp: number; unit: string; fetchedAt: number }>();
+
+async function fetchCityTemp(cityLabel: string): Promise<{ temp: number; unit: string } | null> {
+  const cached = cityTempCache.get(cityLabel);
+  if (cached && Date.now() - cached.fetchedAt < 30 * 60 * 1000) {
+    return { temp: cached.temp, unit: cached.unit };
+  }
+  try {
+    const ac1 = new AbortController();
+    setTimeout(() => ac1.abort(), 5000);
+    const geoRes = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityLabel)}&count=1&format=json`,
+      { signal: ac1.signal },
+    );
+    const geoData = await geoRes.json();
+    const loc = geoData.results?.[0];
+    if (!loc) return null;
+
+    const ac2 = new AbortController();
+    setTimeout(() => ac2.abort(), 5000);
+    const wxRes = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m&temperature_unit=celsius`,
+      { signal: ac2.signal },
+    );
+    const wxData = await wxRes.json();
+    const temp = wxData.current?.temperature_2m;
+    if (temp == null) return null;
+
+    const rounded = Math.round(temp);
+    cityTempCache.set(cityLabel, { temp: rounded, unit: '°C', fetchedAt: Date.now() });
+    return { temp: rounded, unit: '°C' };
+  } catch { return null; }
+}
+
+const THERM_SVG = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`;
+
 function renderWorldClocks(clocks: WorldClock[]) {
   const bar = document.getElementById('world-clocks-bar') as HTMLElement;
   bar.innerHTML = '';
@@ -142,28 +179,33 @@ function renderWorldClocks(clocks: WorldClock[]) {
     const timeEl = document.createElement('div');
     timeEl.className = 'world-clock-time';
 
-    const dateEl = document.createElement('div');
-    dateEl.className = 'world-clock-date';
+    const tempEl = document.createElement('div');
+    tempEl.className = 'world-clock-temp';
+    tempEl.innerHTML = `${THERM_SVG}<span>—</span>`;
 
-    card.append(cityEl, timeEl, dateEl);
+    card.append(cityEl, timeEl, tempEl);
     bar.appendChild(card);
 
-    const update = () => {
+    // Update clock every minute
+    const updateClock = () => {
       try {
-        const now = new Date();
-        timeEl.textContent = now.toLocaleTimeString('en-GB', {
+        timeEl.textContent = new Date().toLocaleTimeString('en-GB', {
           timeZone: timezone, hour: '2-digit', minute: '2-digit',
         });
-        dateEl.textContent = now.toLocaleDateString('en-GB', {
-          timeZone: timezone, day: '2-digit', month: '2-digit', year: 'numeric',
-        });
-      } catch {
-        timeEl.textContent = '--:--';
-        dateEl.textContent = '--/--/----';
-      }
+      } catch { timeEl.textContent = '--:--'; }
     };
-    update();
-    setInterval(update, 10000);
+    updateClock();
+    setInterval(updateClock, 10000);
+
+    // Fetch temperature and refresh every 30 min
+    const updateTemp = () => {
+      fetchCityTemp(label).then(result => {
+        const span = tempEl.querySelector('span')!;
+        span.textContent = result ? `${result.temp}${result.unit}` : '—';
+      });
+    };
+    updateTemp();
+    setInterval(updateTemp, 30 * 60 * 1000);
   });
 }
 
