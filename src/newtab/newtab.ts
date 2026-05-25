@@ -616,6 +616,201 @@ function initBookmarkImport() {
   });
 }
 
+// ─── News ─────────────────────────────────────────────────────────────────────
+
+interface NewsItem {
+  id: string | number;
+  title: string;
+  url: string;
+  score: number;
+  by: string;
+  time: number;   // unix seconds
+  comments: number;
+  domain: string;
+}
+
+const NEWS_CACHE_TTL = 30 * 60 * 1000;
+let activeNewsTab = 'top';
+
+function newsExtractDomain(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, ''); }
+  catch { return ''; }
+}
+
+function newsTimeAgo(unixSec: number): string {
+  const diff = Date.now() / 1000 - unixSec;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+async function fetchHNTop(): Promise<NewsItem[]> {
+  const r = await fetch(
+    'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=20',
+    { signal: AbortSignal.timeout(7000) }
+  );
+  const data = await r.json();
+  return (data.hits ?? []).map((h: any) => ({
+    id: h.objectID,
+    title: h.title ?? h.story_title ?? '',
+    url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,
+    score: h.points ?? 0,
+    by: h.author ?? '',
+    time: Math.floor(new Date(h.created_at).getTime() / 1000),
+    comments: h.num_comments ?? 0,
+    domain: h.url ? newsExtractDomain(h.url) : 'news.ycombinator.com',
+  })).filter((i: NewsItem) => i.title);
+}
+
+async function fetchHNRising(): Promise<NewsItem[]> {
+  const since = Math.floor(Date.now() / 1000) - 18 * 3600;
+  const r = await fetch(
+    `https://hn.algolia.com/api/v1/search_by_date?tags=story&numericFilters=points>50,created_at_i>${since}&hitsPerPage=20`,
+    { signal: AbortSignal.timeout(7000) }
+  );
+  const data = await r.json();
+  return (data.hits ?? []).map((h: any) => ({
+    id: h.objectID,
+    title: h.title ?? h.story_title ?? '',
+    url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,
+    score: h.points ?? 0,
+    by: h.author ?? '',
+    time: Math.floor(new Date(h.created_at).getTime() / 1000),
+    comments: h.num_comments ?? 0,
+    domain: h.url ? newsExtractDomain(h.url) : 'news.ycombinator.com',
+  })).filter((i: NewsItem) => i.title);
+}
+
+async function fetchDevOpsNews(): Promise<NewsItem[]> {
+  const r = await fetch(
+    'https://dev.to/api/articles?tags=devops,kubernetes,docker&top=3&per_page=20',
+    { signal: AbortSignal.timeout(7000) }
+  );
+  const data: any[] = await r.json();
+  return data.map(a => ({
+    id: a.id,
+    title: a.title ?? '',
+    url: a.url ?? `https://dev.to${a.path ?? ''}`,
+    score: a.public_reactions_count ?? 0,
+    by: a.user?.name ?? a.user?.username ?? '',
+    time: Math.floor(new Date(a.published_at).getTime() / 1000),
+    comments: a.comments_count ?? 0,
+    domain: 'dev.to',
+  })).filter(i => i.title);
+}
+
+function renderNewsSkeleton() {
+  const feed = document.getElementById('news-feed')!;
+  feed.innerHTML = Array.from({ length: 7 }).map(() => `
+    <div class="news-skeleton-card">
+      <div class="sk-line sk-rank"></div>
+      <div class="sk-body">
+        <div class="sk-line sk-title-1"></div>
+        <div class="sk-line sk-title-2"></div>
+        <div class="sk-line sk-meta"></div>
+      </div>
+    </div>`).join('');
+}
+
+function renderNewsCards(items: NewsItem[]) {
+  const feed = document.getElementById('news-feed')!;
+  if (!items.length) {
+    feed.innerHTML = '<p class="news-empty">No stories found.</p>';
+    return;
+  }
+  feed.innerHTML = '';
+  items.forEach((item, i) => {
+    const a = document.createElement('a');
+    a.className = 'news-card';
+    a.href = item.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    // Score colour: orange 300+, purple 100+, green otherwise
+    const scoreColor = item.score >= 300 ? '#fb923c' : item.score >= 100 ? '#a78bfa' : '#4ade80';
+    a.innerHTML = `
+      <div class="news-card-rank">${i + 1}</div>
+      <div class="news-card-body">
+        <div class="news-card-title">${item.title}</div>
+        <div class="news-card-meta">
+          <span class="news-score" style="color:${scoreColor};background:${scoreColor}1a">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            ${item.score}
+          </span>
+          ${item.domain ? `<span class="news-sep">·</span><span class="news-domain">${item.domain}</span>` : ''}
+          <span class="news-sep">·</span>
+          <span class="news-time">${newsTimeAgo(item.time)}</span>
+          ${item.comments ? `<span class="news-comments">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            ${item.comments}
+          </span>` : ''}
+        </div>
+      </div>`;
+    feed.appendChild(a);
+  });
+}
+
+function setNewsSpinner(visible: boolean) {
+  document.getElementById('news-refresh-spinner')?.classList.toggle('hidden', !visible);
+}
+
+async function loadNews(tab: string, force = false) {
+  const cacheKey = `mt_news_${tab}`;
+  if (!force) {
+    const cached = await chrome.storage.local.get(cacheKey);
+    const entry = cached[cacheKey] as { items: NewsItem[]; cachedAt: number } | undefined;
+    if (entry && Date.now() - entry.cachedAt < NEWS_CACHE_TTL) {
+      renderNewsCards(entry.items);
+      return;
+    }
+  }
+  renderNewsSkeleton();
+  setNewsSpinner(true);
+  try {
+    let items: NewsItem[];
+    if (tab === 'top') items = await fetchHNTop();
+    else if (tab === 'rising') items = await fetchHNRising();
+    else items = await fetchDevOpsNews();
+    renderNewsCards(items);
+    await chrome.storage.local.set({ [cacheKey]: { items, cachedAt: Date.now() } });
+  } catch {
+    const feed = document.getElementById('news-feed')!;
+    feed.innerHTML = '<p class="news-error">Could not load stories. Check your connection.</p>';
+  } finally {
+    setNewsSpinner(false);
+  }
+}
+
+function initNews() {
+  const panel = document.getElementById('news-panel')!;
+
+  document.getElementById('btn-news-toggle')?.addEventListener('click', () => {
+    const opening = !panel.classList.contains('open');
+    panel.classList.remove('hidden');
+    requestAnimationFrame(() => panel.classList.toggle('open'));
+    if (opening) loadNews(activeNewsTab);
+  });
+
+  document.getElementById('btn-news-close')?.addEventListener('click', () => {
+    panel.classList.remove('open');
+  });
+
+  document.getElementById('btn-news-refresh')?.addEventListener('click', () => {
+    loadNews(activeNewsTab, true);
+  });
+
+  panel.querySelectorAll<HTMLButtonElement>('.news-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset['ntab']!;
+      if (tab === activeNewsTab) return;
+      activeNewsTab = tab;
+      panel.querySelectorAll('.news-tab').forEach(t => t.classList.remove('news-tab--active'));
+      btn.classList.add('news-tab--active');
+      loadNews(tab);
+    });
+  });
+}
+
 // ─── Notes ────────────────────────────────────────────────────────────────────
 
 async function initNotes() {
@@ -2240,6 +2435,7 @@ async function init() {
   await initNotes();
   await initCountdowns();
   initBookmarkImport();
+  initNews();
   initPomodoro();
   initFocusMode();
   initQuoteRefresh();
