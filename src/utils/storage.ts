@@ -94,6 +94,28 @@ export interface CustomYtVideo {
   addedAt: number;
 }
 
+export interface YtPlayState {
+  id: string;
+  title: string;
+  ch: string;
+  startedAt: number;      // Date.now() when playback started or resumed
+  pausedPosition: number; // seconds elapsed when paused (0 when playing)
+  isPaused: boolean;
+}
+
+export async function getYtPlayState(): Promise<YtPlayState | null> {
+  const result = await chrome.storage.local.get('mt_yt_play_state');
+  return (result['mt_yt_play_state'] as YtPlayState) ?? null;
+}
+
+export async function saveYtPlayState(s: YtPlayState): Promise<void> {
+  await chrome.storage.local.set({ mt_yt_play_state: s });
+}
+
+export async function clearYtPlayState(): Promise<void> {
+  await chrome.storage.local.remove('mt_yt_play_state');
+}
+
 const DEFAULTS: Settings = {
   name: '',
   searchEngine: 'google',

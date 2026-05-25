@@ -330,6 +330,15 @@
       <!-- Video grid -->
       <div id="yt-grid" class="yt-grid"></div>
 
+      <!-- Mini now-playing bar (shown in grid view while music plays) -->
+      <div id="yt-now-playing-bar" class="yt-now-playing-bar hidden">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span id="yt-np-title" class="yt-np-title">—</span>
+        <button id="yt-np-stop" class="yt-np-stop" title="Stop">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        </button>
+      </div>
+
       <!-- Player view (shown after clicking a card) -->
       <div id="yt-player-view" class="yt-player-view hidden">
         <div class="yt-player-header">
@@ -338,6 +347,20 @@
             Back
           </button>
           <span id="yt-player-title" class="yt-player-title"></span>
+          <div class="yt-player-controls">
+            <button id="yt-btn-prev" class="yt-ctrl-btn" title="Previous (←)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+            </button>
+            <button id="yt-btn-shuffle" class="yt-ctrl-btn" title="Shuffle">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+            </button>
+            <button id="yt-btn-next" class="yt-ctrl-btn" title="Next (→)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+            </button>
+            <button id="yt-btn-loop" class="yt-ctrl-btn" title="Loop mode">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+          </div>
           <a id="yt-open-link" class="yt-open-link" target="_blank" rel="noopener" title="Open in YouTube">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           </a>
