@@ -980,6 +980,19 @@ async function renderWatchlistAlerts(settings: Settings) {
   await saveWatchlist(watchlist);
 
   holdingsEl.innerHTML = '';
+
+  const hasStocks = watchlist.some(i => i.type === 'stock');
+  if (hasStocks && !settings.finnhubKey) {
+    const banner = document.createElement('div');
+    banner.className = 'watchlist-no-key-banner';
+    banner.innerHTML = `🔑 Stock prices need a <strong>Finnhub API key</strong>. Add it in <a class="banner-settings-link" href="#">Settings → Markets</a>. It's free.`;
+    banner.querySelector<HTMLAnchorElement>('.banner-settings-link')?.addEventListener('click', e => {
+      e.preventDefault();
+      document.getElementById('settings-btn')?.click();
+    });
+    holdingsEl.appendChild(banner);
+  }
+
   watchlist.forEach(item => {
     const isCrypto = item.type === 'crypto';
     const data = isCrypto ? cryptoPrices[item.coinId ?? ''] : stockPrices[item.symbol];
@@ -1001,8 +1014,8 @@ async function renderWatchlistAlerts(settings: Settings) {
         <span class="portfolio-symbol">${item.symbol}</span>
         <span class="portfolio-type-badge ${item.type}">${item.type}</span>
       </div>
-      <span class="market-row-price" style="flex:1;text-align:right">${price ? '$' + fmtPrice(price) : '—'}</span>
-      <span class="market-row-change ${changeClass(changePct)}" style="min-width:72px">${price ? changeArrow(changePct) + ' ' + Math.abs(changePct).toFixed(2) + '%' : '—'}</span>
+      <span class="market-row-price" style="flex:1;text-align:right">${price ? '$' + fmtPrice(price) : (!isCrypto && !settings.finnhubKey ? '<span class="watch-no-key-hint" title="Add your Finnhub API key in Settings → Markets">🔑 Key needed</span>' : '—')}</span>
+      <span class="market-row-change ${changeClass(changePct)}" style="min-width:72px">${price ? changeArrow(changePct) + ' ' + Math.abs(changePct).toFixed(2) + '%' : ''}</span>
       <div class="market-row-sparkline">${spark}</div>
       ${hasAlert ? `<span class="watch-alert-badge${alertFired ? ' triggered' : ''}" title="Alert: ${item.alertDirection} $${item.alertPrice}">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
