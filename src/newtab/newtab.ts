@@ -557,20 +557,130 @@ function initBookmarkImport() {
 // ─── Notes ────────────────────────────────────────────────────────────────────
 
 async function initNotes() {
-  const panel = document.getElementById('notes-panel') as HTMLElement;
+  const panel    = document.getElementById('notes-panel')    as HTMLElement;
   const textarea = document.getElementById('notes-textarea') as HTMLTextAreaElement;
+  const wordCountEl  = document.getElementById('notes-wordcount')   as HTMLElement;
+  const saveStatusEl = document.getElementById('notes-save-status') as HTMLElement;
+  const saveIconEl   = document.getElementById('notes-save-icon')   as HTMLElement;
 
   textarea.value = await getNotes();
+  updateWordCount();
 
+  // ── Word count ──────────────────────────────────────────────────────────────
+  function updateWordCount() {
+    const text = textarea.value.trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    wordCountEl.textContent = `${words} word${words !== 1 ? 's' : ''}`;
+  }
+
+  // ── Autosave with status indicator ─────────────────────────────────────────
   let saveTimer: ReturnType<typeof setTimeout>;
+  function setSaveStatus(state: 'saving' | 'saved') {
+    saveStatusEl.className = `notes-save-status ${state}`;
+    if (state === 'saving') {
+      saveIconEl.innerHTML = `<circle cx="12" cy="12" r="9" stroke-dasharray="56" stroke-dashoffset="14" stroke-linecap="round"/>`;
+      saveStatusEl.childNodes[saveStatusEl.childNodes.length - 1].textContent = ' Saving…';
+    } else {
+      saveIconEl.innerHTML = `<polyline points="20 6 9 17 4 12"/>`;
+      saveStatusEl.childNodes[saveStatusEl.childNodes.length - 1].textContent = ' Saved';
+    }
+  }
+
   textarea.addEventListener('input', () => {
+    updateWordCount();
+    setSaveStatus('saving');
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveNotes(textarea.value), 600);
+    saveTimer = setTimeout(async () => {
+      await saveNotes(textarea.value);
+      setSaveStatus('saved');
+    }, 700);
   });
 
+  // ── Keyboard shortcuts (Ctrl/Cmd + B/I) ────────────────────────────────────
+  textarea.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); applyFmt('bold'); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); applyFmt('italic'); }
+    // Tab inserts 2 spaces instead of leaving the textarea
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = textarea.selectionStart, en = textarea.selectionEnd;
+      textarea.value = textarea.value.slice(0, s) + '  ' + textarea.value.slice(en);
+      textarea.selectionStart = textarea.selectionEnd = s + 2;
+    }
+  });
+
+  // ── Format toolbar ──────────────────────────────────────────────────────────
+  function applyFmt(fmt: string) {
+    const s = textarea.selectionStart, e = textarea.selectionEnd;
+    const selected = textarea.value.slice(s, e);
+    const before = textarea.value.slice(0, s);
+    const after  = textarea.value.slice(e);
+
+    let replacement = selected;
+    let cursorOffset = 0;
+
+    if (fmt === 'bold') {
+      replacement = `**${selected || 'bold text'}**`;
+      cursorOffset = selected ? 0 : -2;
+    } else if (fmt === 'italic') {
+      replacement = `_${selected || 'italic text'}_`;
+      cursorOffset = selected ? 0 : -1;
+    } else if (fmt === 'code') {
+      replacement = `\`${selected || 'code'}\``;
+      cursorOffset = selected ? 0 : -1;
+    } else if (fmt === 'ul') {
+      // Prefix each selected line with "- "
+      const lines = (selected || 'List item').split('\n');
+      replacement = lines.map(l => `- ${l}`).join('\n');
+      cursorOffset = 0;
+    } else if (fmt === 'task') {
+      const lines = (selected || 'Task').split('\n');
+      replacement = lines.map(l => `- [ ] ${l}`).join('\n');
+      cursorOffset = 0;
+    } else if (fmt === 'hr') {
+      replacement = `\n---\n`;
+      cursorOffset = 0;
+    } else if (fmt === 'h1') {
+      const lines = (selected || 'Heading').split('\n');
+      replacement = lines.map(l => l.startsWith('# ') ? l.slice(2) : `# ${l}`).join('\n');
+      cursorOffset = 0;
+    }
+
+    textarea.value = before + replacement + after;
+    const newPos = s + replacement.length + cursorOffset;
+    textarea.selectionStart = textarea.selectionEnd = newPos;
+    textarea.focus();
+    textarea.dispatchEvent(new Event('input'));
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.notes-fmt-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyFmt(btn.dataset['fmt']!));
+  });
+
+  // ── Copy all ────────────────────────────────────────────────────────────────
+  document.getElementById('btn-notes-copy')?.addEventListener('click', async () => {
+    if (!textarea.value) return;
+    await navigator.clipboard.writeText(textarea.value);
+    const btn = document.getElementById('btn-notes-copy') as HTMLButtonElement;
+    const orig = btn.innerHTML;
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    setTimeout(() => { btn.innerHTML = orig; }, 1500);
+  });
+
+  // ── Clear ───────────────────────────────────────────────────────────────────
+  document.getElementById('btn-notes-clear')?.addEventListener('click', () => {
+    if (!textarea.value) return;
+    if (confirm('Clear all notes?')) {
+      textarea.value = '';
+      textarea.dispatchEvent(new Event('input'));
+    }
+  });
+
+  // ── Open / close ────────────────────────────────────────────────────────────
   document.getElementById('btn-notes-toggle')?.addEventListener('click', () => {
-    panel.classList.toggle('hidden', false);
+    panel.classList.remove('hidden');
     panel.classList.toggle('open');
+    if (panel.classList.contains('open')) setTimeout(() => textarea.focus(), 280);
   });
   document.getElementById('btn-notes-close')?.addEventListener('click', () => panel.classList.remove('open'));
 }
