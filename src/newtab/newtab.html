@@ -246,27 +246,49 @@
 
   <!-- Quick links panel (slide from left) -->
   <aside id="links-panel" class="links-panel hidden">
-    <div class="panel-header">
-      <span>Quick Links</span>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button id="btn-new-folder" class="panel-action-btn" title="New folder">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-          New Folder
+
+    <!-- Header -->
+    <div class="links-header">
+      <div class="links-header-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span>Quick Links</span>
+      </div>
+      <div class="links-header-actions">
+        <button id="btn-new-folder" class="links-icon-btn" title="New folder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
         </button>
-        <button id="btn-bookmarks-import" class="panel-action-btn" title="Import from bookmarks">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-          Import
+        <button id="btn-bookmarks-import" class="links-icon-btn" title="Import from Chrome bookmarks">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
-        <button id="btn-links-close" class="icon-btn-sm">✕</button>
+        <button id="btn-bookmarks-export" class="links-icon-btn" title="Export links as JSON">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <button id="btn-links-close" class="links-icon-btn links-icon-btn--close" title="Close">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
     </div>
+
+    <!-- Links list -->
     <ul id="links-list" class="links-list"></ul>
-    <form id="link-form" class="link-form">
-      <input id="link-label" type="text" placeholder="Label" maxlength="20" />
-      <input id="link-url" type="url" placeholder="https://…" />
-      <select id="link-folder-sel" class="link-folder-sel"></select>
-      <button type="submit">Add</button>
-    </form>
+
+    <!-- Add link section -->
+    <div class="links-add-section">
+      <button id="btn-links-add-toggle" class="links-add-toggle">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add a link
+      </button>
+      <form id="link-form" class="link-form hidden">
+        <input id="link-label" type="text" placeholder="Label" maxlength="20" autocomplete="off" />
+        <input id="link-url" type="url" placeholder="https://…" autocomplete="off" />
+        <select id="link-folder-sel" class="link-folder-sel"></select>
+        <div class="link-form-actions">
+          <button type="button" id="btn-link-form-cancel" class="link-form-cancel">Cancel</button>
+          <button type="submit" class="link-form-submit">Add Link</button>
+        </div>
+      </form>
+    </div>
+
   </aside>
 
   <!-- Notes panel (slide from left, layered) -->

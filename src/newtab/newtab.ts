@@ -455,7 +455,10 @@ function buildLinkItem(link: QuickLink): HTMLLIElement {
   const favicon = document.createElement('img');
   favicon.src = faviconUrl(link.url); favicon.alt = '';
   favicon.onerror = () => { favicon.style.display = 'none'; };
-  a.append(favicon, link.label);
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'link-item-label';
+  labelSpan.textContent = link.label;
+  a.append(favicon, labelSpan);
   const del = document.createElement('button');
   del.className = 'link-del'; del.textContent = '✕'; del.title = 'Remove';
   del.addEventListener('click', () => { links = links.filter(l => l.id !== link.id); saveLinks(links); renderLinks(); });
@@ -540,8 +543,16 @@ async function initLinks() {
   const urlInput = document.getElementById('link-url') as HTMLInputElement;
   const folderSel = document.getElementById('link-folder-sel') as HTMLSelectElement;
   const newFolderBtn = document.getElementById('btn-new-folder') as HTMLButtonElement;
+  const addToggleBtn = document.getElementById('btn-links-add-toggle') as HTMLButtonElement;
+  const cancelBtn = document.getElementById('btn-link-form-cancel') as HTMLButtonElement;
 
   syncFolderSelect();
+
+  // Toggle add form
+  function showAddForm() { form.classList.remove('hidden'); addToggleBtn.classList.add('hidden'); labelInput.focus(); }
+  function hideAddForm() { form.classList.add('hidden'); addToggleBtn.classList.remove('hidden'); labelInput.value = ''; urlInput.value = ''; if (folderSel) folderSel.value = ''; }
+  addToggleBtn?.addEventListener('click', showAddForm);
+  cancelBtn?.addEventListener('click', hideAddForm);
 
   // New folder
   newFolderBtn?.addEventListener('click', () => {
@@ -557,8 +568,7 @@ async function initLinks() {
     if (!label || !url) return;
     const folderId = folderSel?.value || undefined;
     links.push({ id: Date.now().toString(), label, url, folderId });
-    saveLinks(links); renderLinks(); labelInput.value = ''; urlInput.value = '';
-    if (folderSel) folderSel.value = '';
+    saveLinks(links); renderLinks(); hideAddForm();
   });
 
   // Toggle panel
@@ -568,6 +578,16 @@ async function initLinks() {
     panel.classList.toggle('open');
   });
   document.getElementById('btn-links-close')?.addEventListener('click', () => panel.classList.remove('open'));
+
+  // Export links as JSON
+  document.getElementById('btn-bookmarks-export')?.addEventListener('click', () => {
+    const data = { version: 1, exportedAt: new Date().toISOString(), folders, links };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'monktab-links.json'; a.click();
+    URL.revokeObjectURL(url);
+  });
 }
 
 // ─── Bookmark Import ──────────────────────────────────────────────────────────
