@@ -1161,34 +1161,16 @@
       </p>
     </div>
 
-    <!-- Portfolio pane -->
+    <!-- Watchlist + Alerts pane -->
     <div id="market-pane-portfolio" class="market-pane hidden">
-      <!-- Hero P&L summary -->
-      <div id="portfolio-hero" class="portfolio-hero hidden">
-        <div class="portfolio-hero-left">
-          <span class="portfolio-hero-label">Total Value</span>
-          <span id="portfolio-total-val" class="portfolio-total-val">$0.00</span>
-          <span id="portfolio-total-pnl" class="portfolio-total-pnl">—</span>
-        </div>
-        <div class="portfolio-hero-right">
-          <div class="portfolio-hero-stat">
-            <span class="portfolio-hero-stat-label">Invested</span>
-            <span id="portfolio-invested" class="portfolio-hero-stat-val">$0.00</span>
-          </div>
-          <div class="portfolio-hero-stat">
-            <span class="portfolio-hero-stat-label">All-time P&amp;L</span>
-            <span id="portfolio-alltime-pnl" class="portfolio-hero-stat-val">—</span>
-          </div>
-        </div>
-      </div>
 
-      <!-- Holdings table -->
+      <!-- Watch items list -->
       <div id="portfolio-holdings" class="portfolio-holdings"></div>
 
-      <!-- Add holding -->
+      <!-- Add watch item -->
       <button id="btn-portfolio-add-toggle" class="portfolio-add-toggle">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add holding
+        Add to watchlist
       </button>
       <form id="portfolio-add-form" class="portfolio-add-form hidden">
         <div class="portfolio-form-row">
@@ -1197,15 +1179,25 @@
             <option value="stock">Stock</option>
           </select>
           <input id="pf-symbol" type="text" class="portfolio-input" placeholder="BTC / AAPL" maxlength="12" autocomplete="off" />
-          <input id="pf-coinid" type="text" class="portfolio-input" placeholder="CoinGecko ID (e.g. bitcoin)" autocomplete="off" />
+          <div id="pf-coinid-wrap" style="display:contents">
+            <input id="pf-coinid" type="text" class="portfolio-input" placeholder="CoinGecko ID (e.g. bitcoin)" autocomplete="off" />
+          </div>
         </div>
-        <div class="portfolio-form-row">
-          <input id="pf-units" type="number" class="portfolio-input" placeholder="Units / Shares" min="0" step="any" />
-          <input id="pf-avgcost" type="number" class="portfolio-input" placeholder="Avg cost per unit ($)" min="0" step="any" />
+        <div class="portfolio-form-row portfolio-alert-row">
+          <span class="portfolio-alert-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            Alert when price goes
+          </span>
+          <select id="pf-alert-dir" class="portfolio-select" style="flex:0 0 auto;min-width:80px">
+            <option value="">No alert</option>
+            <option value="above">Above</option>
+            <option value="below">Below</option>
+          </select>
+          <input id="pf-alert-price" type="number" class="portfolio-input" placeholder="Target price ($)" min="0" step="any" />
         </div>
         <div class="portfolio-form-actions">
           <button type="button" id="btn-portfolio-cancel" class="portfolio-btn-cancel">Cancel</button>
-          <button type="submit" class="portfolio-btn-submit">Add to Portfolio</button>
+          <button type="submit" class="portfolio-btn-submit">Add to Watchlist</button>
         </div>
       </form>
     </div>

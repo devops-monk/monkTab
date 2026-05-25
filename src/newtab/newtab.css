@@ -1382,6 +1382,30 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .portfolio-th:first-child { text-align: left; }
 
 /* Add holding form */
+/* Alert row in add form */
+.portfolio-alert-row { align-items: center; }
+.portfolio-alert-label { font-size: 12px; color: var(--text-dim); white-space: nowrap; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+
+/* Alert badge on watch item */
+.watch-alert-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 6px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+  color: var(--text-dimmer); white-space: nowrap; flex-shrink: 0;
+}
+.watch-alert-badge.triggered {
+  background: rgba(251,146,60,0.18); border-color: rgba(251,146,60,0.4); color: #fb923c;
+  animation: alertPulse 1.5s ease-in-out 3;
+}
+@keyframes alertPulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 4px rgba(251,146,60,0.25); }
+}
+.portfolio-row.alert-fired {
+  border-color: rgba(251,146,60,0.35) !important;
+  background: rgba(251,146,60,0.06) !important;
+}
+
 .portfolio-add-toggle {
   display: flex; align-items: center; justify-content: center; gap: 7px;
   padding: 8px 14px; background: var(--glass); border: 1px dashed var(--glass-border);

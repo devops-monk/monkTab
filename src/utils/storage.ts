@@ -284,22 +284,23 @@ export async function saveCustomYtVideos(videos: CustomYtVideo[]): Promise<void>
   await chrome.storage.local.set({ mt_yt_custom: videos });
 }
 
-export interface PortfolioHolding {
+export interface WatchItem {
   id: string;
-  symbol: string;          // display symbol, e.g. BTC, AAPL
+  symbol: string;            // display symbol, e.g. BTC, AAPL
   type: 'crypto' | 'stock';
-  coinId?: string;         // CoinGecko ID for crypto (e.g. 'bitcoin')
-  units: number;           // shares or coins owned
-  avgCost: number;         // average cost per unit in USD
+  coinId?: string;           // CoinGecko ID for crypto (e.g. 'bitcoin')
+  alertPrice?: number;       // trigger price
+  alertDirection?: 'above' | 'below';
+  alertTriggered?: boolean;  // latched once fired
 }
 
-export async function getPortfolio(): Promise<PortfolioHolding[]> {
-  const result = await chrome.storage.local.get('mt_portfolio');
-  return (result['mt_portfolio'] as PortfolioHolding[]) ?? [];
+export async function getWatchlist(): Promise<WatchItem[]> {
+  const result = await chrome.storage.local.get('mt_watchlist');
+  return (result['mt_watchlist'] as WatchItem[]) ?? [];
 }
 
-export async function savePortfolio(holdings: PortfolioHolding[]): Promise<void> {
-  await chrome.storage.local.set({ mt_portfolio: holdings });
+export async function saveWatchlist(items: WatchItem[]): Promise<void> {
+  await chrome.storage.local.set({ mt_watchlist: items });
 }
 
 export function todayString(): string {

@@ -4,8 +4,8 @@ import {
   getFocusHistory, logFocusSession, getCustomYtVideos, saveCustomYtVideos,
   getYtPlayState, saveYtPlayState, clearYtPlayState, getYtRecent, addYtRecent,
   todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
-  type CustomYtVideo, type YtPlayState, type PortfolioHolding,
-  getPortfolio, savePortfolio,
+  type CustomYtVideo, type YtPlayState, type WatchItem,
+  getWatchlist, saveWatchlist,
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
 import { getBackground } from '../utils/background';
@@ -914,152 +914,146 @@ async function loadMarketWatchlist(settings: Settings, force = false) {
   }
 }
 
-// ─── Portfolio ────────────────────────────────────────────────────────────────
+// ─── Watchlist + Alerts ───────────────────────────────────────────────────────
 
-let portfolio: PortfolioHolding[] = [];
+let watchlist: WatchItem[] = [];
 
-async function loadPortfolio(settings: Settings) {
-  portfolio = await getPortfolio();
-  await renderPortfolio(settings);
+function fireAlert(item: WatchItem, price: number) {
+  if (!item.alertPrice || !item.alertDirection) return;
+  const triggered = item.alertDirection === 'above' ? price >= item.alertPrice : price <= item.alertPrice;
+  if (!triggered || item.alertTriggered) return;
+  item.alertTriggered = true;
+  const dir = item.alertDirection === 'above' ? '▲ above' : '▼ below';
+  try {
+    chrome.notifications.create(`alert-${item.id}`, {
+      type: 'basic',
+      iconUrl: '/icons/icon48.png',
+      title: `MonkTab Price Alert — ${item.symbol}`,
+      message: `${item.symbol} is now $${fmtPrice(price)}, ${dir} your target of $${fmtPrice(item.alertPrice)}`,
+    });
+  } catch { /* notifications may not be available */ }
 }
 
-async function renderPortfolio(settings: Settings) {
-  const heroEl = document.getElementById('portfolio-hero')!;
+async function renderWatchlistAlerts(settings: Settings) {
   const holdingsEl = document.getElementById('portfolio-holdings')!;
-
-  if (portfolio.length === 0) {
-    heroEl.classList.add('hidden');
-    holdingsEl.innerHTML = '<p class="portfolio-empty">No holdings yet. Add your first position below.</p>';
-    return;
-  }
-  heroEl.classList.remove('hidden');
   holdingsEl.innerHTML = '';
 
-  // Fetch live prices for all holdings
-  const cryptoIds = portfolio.filter(h => h.type === 'crypto' && h.coinId).map(h => h.coinId!);
-  const stockSymbols = portfolio.filter(h => h.type === 'stock').map(h => h.symbol);
-
-  let cryptoPrices: Record<string, number> = {};
-  let stockPrices: Record<string, number> = {};
-
-  try {
-    if (cryptoIds.length) {
-      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${cryptoIds.join(',')}&vs_currencies=usd`;
-      const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
-      const d = await r.json();
-      cryptoIds.forEach(id => { cryptoPrices[id] = d[id]?.usd ?? 0; });
-    }
-    if (stockSymbols.length && settings.finnhubKey) {
-      const quotes = await Promise.all(stockSymbols.map(s => fetchFinnhubQuote(s, settings.finnhubKey)));
-      quotes.forEach(q => { if (q) stockPrices[q.symbol] = q.price; });
-    }
-  } catch { /* prices stay 0 */ }
-
-  let totalValue = 0, totalCost = 0;
-  // Table header
-  const hdr = document.createElement('div');
-  hdr.className = 'portfolio-table-header';
-  hdr.innerHTML = `<span class="portfolio-th">Asset</span><span class="portfolio-th">Units</span><span class="portfolio-th">Avg Cost</span><span class="portfolio-th">Price</span><span class="portfolio-th">Value / P&L</span><span class="portfolio-th"></span>`;
-  holdingsEl.appendChild(hdr);
-
-  for (const h of portfolio) {
-    const curPrice = h.type === 'crypto' ? (cryptoPrices[h.coinId ?? ''] ?? 0) : (stockPrices[h.symbol] ?? 0);
-    const value = curPrice * h.units;
-    const cost = h.avgCost * h.units;
-    const pnl = value - cost;
-    const pnlPct = cost > 0 ? ((value - cost) / cost) * 100 : 0;
-    totalValue += value; totalCost += cost;
-
-    const priceKnown = curPrice > 0;
-    const pnlClass = pnl >= 0 ? 'up' : 'down';
-    const pnlSign = pnl >= 0 ? '+' : '';
-
-    const row = document.createElement('div');
-    row.className = 'portfolio-row';
-    row.innerHTML = `
-      <div class="portfolio-col-symbol">
-        <span class="portfolio-symbol">${h.symbol}</span>
-        <span class="portfolio-type-badge ${h.type}">${h.type}</span>
-      </div>
-      <div class="portfolio-col">
-        <span class="portfolio-col-label">Units</span>
-        <span class="portfolio-col-val">${h.units}</span>
-      </div>
-      <div class="portfolio-col">
-        <span class="portfolio-col-label">Avg Cost</span>
-        <span class="portfolio-col-val">$${fmtPrice(h.avgCost)}</span>
-      </div>
-      <div class="portfolio-col">
-        <span class="portfolio-col-label">Price</span>
-        <span class="portfolio-col-val">${priceKnown ? '$' + fmtPrice(curPrice) : '—'}</span>
-      </div>
-      <div class="portfolio-col">
-        <span class="portfolio-col-label">Value / P&L</span>
-        <span class="portfolio-col-val">${priceKnown ? '$' + fmtPrice(value) : '—'}</span>
-        ${priceKnown ? `<span class="portfolio-col-val ${pnlClass}">${pnlSign}${pnlPct.toFixed(2)}%</span>` : ''}
-      </div>
-      <button class="portfolio-del-btn" data-id="${h.id}" title="Remove">✕</button>`;
-    holdingsEl.appendChild(row);
+  if (watchlist.length === 0) {
+    holdingsEl.innerHTML = '<p class="portfolio-empty">No items yet. Add a stock or crypto below to start watching prices.</p>';
+    return;
   }
 
-  // Delete buttons
-  holdingsEl.querySelectorAll<HTMLButtonElement>('.portfolio-del-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      portfolio = portfolio.filter(h => h.id !== btn.dataset['id']);
-      await savePortfolio(portfolio);
-      renderPortfolio(settings);
-    });
+  // Always fetch fresh prices — show skeleton rows first
+  holdingsEl.innerHTML = `<div class="market-skeleton">${watchlist.map(() => `<div class="market-sk-row"></div>`).join('')}</div>`;
+
+  const cryptoItems = watchlist.filter(i => i.type === 'crypto' && i.coinId);
+  const stockItems = watchlist.filter(i => i.type === 'stock');
+
+  let cryptoPrices: Record<string, { price: number; change24h: number; sparkline: number[] }> = {};
+  let stockPrices: Record<string, { price: number; changePct: number; candles: number[] }> = {};
+
+  await Promise.allSettled([
+    (async () => {
+      if (!cryptoItems.length) return;
+      const ids = cryptoItems.map(i => i.coinId!).join(',');
+      const r = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&sparkline=true&price_change_percentage=24h`, { signal: AbortSignal.timeout(8000) });
+      const coins: CoinData[] = await r.json();
+      coins.forEach(c => { cryptoPrices[c.id] = { price: c.current_price, change24h: c.price_change_percentage_24h, sparkline: c.sparkline_in_7d?.price ?? [] }; });
+    })(),
+    (async () => {
+      if (!stockItems.length || !settings.finnhubKey) return;
+      await Promise.all(stockItems.map(async item => {
+        const [q, candles] = await Promise.all([
+          fetchFinnhubQuote(item.symbol, settings.finnhubKey),
+          fetchFinnhubCandles(item.symbol, settings.finnhubKey),
+        ]);
+        if (q) stockPrices[item.symbol] = { price: q.price, changePct: q.changePct, candles };
+      }));
+    })(),
+  ]);
+
+  // Check and fire alerts
+  watchlist.forEach(item => {
+    const p = item.type === 'crypto' ? cryptoPrices[item.coinId ?? '']?.price : stockPrices[item.symbol]?.price;
+    if (p) fireAlert(item, p);
+  });
+  await saveWatchlist(watchlist);
+
+  holdingsEl.innerHTML = '';
+  watchlist.forEach(item => {
+    const isCrypto = item.type === 'crypto';
+    const data = isCrypto ? cryptoPrices[item.coinId ?? ''] : stockPrices[item.symbol];
+    const price = data?.price ?? 0;
+    const changePct = isCrypto ? (data as any)?.change24h ?? 0 : (data as any)?.changePct ?? 0;
+    const sparkData = isCrypto ? (data as any)?.sparkline ?? [] : (data as any)?.candles ?? [];
+    const pos = changePct >= 0;
+    const spark = sparklineSVG(sparkData, 72, 28, pos);
+    const hasAlert = !!item.alertPrice && !!item.alertDirection;
+    const alertFired = item.alertTriggered;
+    const alertLabel = hasAlert
+      ? `${item.alertDirection === 'above' ? '▲' : '▼'} $${fmtPrice(item.alertPrice!)}`
+      : '';
+
+    const row = document.createElement('div');
+    row.className = `portfolio-row${alertFired ? ' alert-fired' : ''}`;
+    row.innerHTML = `
+      <div class="portfolio-col-symbol">
+        <span class="portfolio-symbol">${item.symbol}</span>
+        <span class="portfolio-type-badge ${item.type}">${item.type}</span>
+      </div>
+      <span class="market-row-price" style="flex:1;text-align:right">${price ? '$' + fmtPrice(price) : '—'}</span>
+      <span class="market-row-change ${changeClass(changePct)}" style="min-width:72px">${price ? changeArrow(changePct) + ' ' + Math.abs(changePct).toFixed(2) + '%' : '—'}</span>
+      <div class="market-row-sparkline">${spark}</div>
+      ${hasAlert ? `<span class="watch-alert-badge${alertFired ? ' triggered' : ''}" title="Alert: ${item.alertDirection} $${item.alertPrice}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        ${alertLabel}
+      </span>` : ''}
+      <button class="portfolio-del-btn" data-id="${item.id}" title="Remove">✕</button>`;
+    holdingsEl.appendChild(row);
   });
 
-  // Hero totals
-  const totalPnl = totalValue - totalCost;
-  const totalPnlPct = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0;
-  const pnlColor = totalPnl >= 0 ? '#4ade80' : '#f87171';
-  const pnlSign = totalPnl >= 0 ? '+' : '';
-
-  document.getElementById('portfolio-total-val')!.textContent = '$' + fmtPrice(totalValue);
-  const pnlEl = document.getElementById('portfolio-total-pnl')!;
-  pnlEl.textContent = `${pnlSign}$${fmtPrice(Math.abs(totalPnl))} (${pnlSign}${totalPnlPct.toFixed(2)}%)`;
-  pnlEl.style.color = pnlColor;
-  document.getElementById('portfolio-invested')!.textContent = '$' + fmtPrice(totalCost);
-  const atPnlEl = document.getElementById('portfolio-alltime-pnl')!;
-  atPnlEl.textContent = `${pnlSign}$${fmtPrice(Math.abs(totalPnl))}`;
-  atPnlEl.style.color = pnlColor;
+  holdingsEl.querySelectorAll<HTMLButtonElement>('.portfolio-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      watchlist = watchlist.filter(i => i.id !== btn.dataset['id']);
+      await saveWatchlist(watchlist);
+      renderWatchlistAlerts(settings);
+    });
+  });
 }
 
-function initPortfolioForm(settings: Settings) {
+function initWatchlistForm(settings: Settings) {
   const form = document.getElementById('portfolio-add-form') as HTMLFormElement;
   const toggleBtn = document.getElementById('btn-portfolio-add-toggle') as HTMLButtonElement;
   const cancelBtn = document.getElementById('btn-portfolio-cancel') as HTMLButtonElement;
   const typeEl = document.getElementById('pf-type') as HTMLSelectElement;
-  const coinIdRow = document.getElementById('pf-coinid') as HTMLInputElement;
+  const coinIdInput = document.getElementById('pf-coinid') as HTMLInputElement;
 
   function showForm() { form.classList.remove('hidden'); toggleBtn.classList.add('hidden'); }
-  function hideForm() {
-    form.classList.add('hidden'); toggleBtn.classList.remove('hidden');
-    form.reset();
-  }
+  function hideForm() { form.classList.add('hidden'); toggleBtn.classList.remove('hidden'); form.reset(); coinIdInput.parentElement!.style.display = ''; }
+
   toggleBtn.addEventListener('click', showForm);
   cancelBtn.addEventListener('click', hideForm);
-
-  // Hide coin ID field for stocks
   typeEl.addEventListener('change', () => {
-    coinIdRow.style.display = typeEl.value === 'crypto' ? '' : 'none';
+    coinIdInput.parentElement!.style.display = typeEl.value === 'stock' ? 'none' : '';
   });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const symbol = (document.getElementById('pf-symbol') as HTMLInputElement).value.trim().toUpperCase();
     const type = typeEl.value as 'crypto' | 'stock';
-    const coinId = (document.getElementById('pf-coinid') as HTMLInputElement).value.trim().toLowerCase() || undefined;
-    const units = parseFloat((document.getElementById('pf-units') as HTMLInputElement).value);
-    const avgCost = parseFloat((document.getElementById('pf-avgcost') as HTMLInputElement).value);
-    if (!symbol || isNaN(units) || isNaN(avgCost) || units <= 0) return;
-    const holding: PortfolioHolding = { id: Date.now().toString(), symbol, type, coinId, units, avgCost };
-    portfolio.push(holding);
-    await savePortfolio(portfolio);
+    const coinId = coinIdInput.value.trim().toLowerCase() || undefined;
+    const alertPriceRaw = (document.getElementById('pf-alert-price') as HTMLInputElement).value.trim();
+    const alertDir = (document.getElementById('pf-alert-dir') as HTMLSelectElement).value as 'above' | 'below' | '';
+    if (!symbol) return;
+    const item: WatchItem = {
+      id: Date.now().toString(), symbol, type, coinId,
+      alertPrice: alertPriceRaw ? parseFloat(alertPriceRaw) : undefined,
+      alertDirection: alertDir || undefined,
+    };
+    watchlist.push(item);
+    await saveWatchlist(watchlist);
     hideForm();
-    renderPortfolio(settings);
+    renderWatchlistAlerts(settings);
   });
 }
 
@@ -1086,10 +1080,13 @@ function initMarkets(settings: Settings) {
 
   document.getElementById('btn-market-close')?.addEventListener('click', () => panel.classList.remove('open'));
 
+  // Pre-load watchlist from storage at init time
+  getWatchlist().then(items => { watchlist = items; });
+
   document.getElementById('btn-market-refresh')?.addEventListener('click', () => {
     if (activeMarketTab === 'overview') loadMarketOverview(true);
     else if (activeMarketTab === 'watchlist') loadMarketWatchlist(settings, true);
-    else renderPortfolio(settings);
+    else renderWatchlistAlerts(settings);
   });
 
   panel.querySelectorAll<HTMLButtonElement>('.market-tab').forEach(btn => {
@@ -1102,11 +1099,11 @@ function initMarkets(settings: Settings) {
       switchPane(tab);
       if (tab === 'overview') loadMarketOverview();
       else if (tab === 'watchlist') loadMarketWatchlist(settings);
-      else loadPortfolio(settings);
+      else renderWatchlistAlerts(settings);
     });
   });
 
-  initPortfolioForm(settings);
+  initWatchlistForm(settings);
 }
 
 // ─── News ─────────────────────────────────────────────────────────────────────
