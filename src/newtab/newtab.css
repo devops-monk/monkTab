@@ -835,17 +835,18 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 }
 .yt-tab {
   padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
-  background: rgba(255,255,255,0.07); border: 1px solid var(--panel-border);
+  background: var(--glass); border: 1px solid var(--glass-border);
   color: var(--text-dim); cursor: pointer; transition: all var(--transition);
+  backdrop-filter: blur(10px);
 }
-.yt-tab:hover { background: rgba(255,255,255,0.13); color: var(--text); }
-.yt-tab--active { background: rgba(255,255,255,0.14); color: var(--text); border-color: rgba(255,255,255,0.2); }
-.yt-tab--cta { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.35); color: rgba(167,139,250,1); margin-left: auto; }
-.yt-tab--cta:hover { background: rgba(167,139,250,0.25); }
+.yt-tab:hover { background: rgba(255,255,255,0.18); color: var(--text); }
+.yt-tab--active { background: rgba(255,255,255,0.22); color: var(--text); border-color: rgba(255,255,255,0.28); }
+.yt-tab--cta { background: rgba(167,139,250,0.22); border-color: rgba(167,139,250,0.45); color: rgba(167,139,250,1); margin-left: auto; }
+.yt-tab--cta:hover { background: rgba(167,139,250,0.34); }
 .yt-pane { display: flex; flex-direction: column; }
 
 /* Now Playing pane */
-.yt-np-pane { align-items: center; gap: 10px; padding: 4px 0 8px; }
+.yt-np-pane { align-items: center; gap: 12px; padding: 4px 0 8px; }
 .yt-np-artwork {
   position: relative; width: 100%; max-width: 220px;
   border-radius: 14px; overflow: hidden; flex-shrink: 0;
@@ -866,40 +867,44 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   display: block; font-size: 11px; color: var(--text-dim); margin-top: 2px;
 }
 .yt-visualizer {
-  width: 100%; max-width: 280px; height: 44px; border-radius: 6px;
-  display: block;
+  width: 100%; max-width: 280px; height: 44px; border-radius: 8px;
+  display: block; background: var(--glass); border: 1px solid var(--glass-border);
+  padding: 2px 4px; box-sizing: border-box;
 }
 .yt-np-controls {
-  display: flex; align-items: center; gap: 8px; justify-content: center;
+  display: flex; align-items: center; gap: 10px; justify-content: center;
 }
 .yt-np-ctrl {
   display: flex; align-items: center; justify-content: center;
-  width: 38px; height: 38px; border-radius: 50%;
-  background: rgba(255,255,255,0.08); border: 1px solid var(--panel-border);
-  color: var(--text-dim); cursor: pointer; transition: all var(--transition);
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--text); cursor: pointer; transition: all var(--transition);
+  backdrop-filter: blur(12px);
 }
-.yt-np-ctrl:hover { background: rgba(255,255,255,0.16); color: var(--text); }
-.yt-np-ctrl.active { color: rgba(167,139,250,1); background: rgba(167,139,250,0.18); border-color: rgba(167,139,250,0.4); }
-.yt-np-ctrl--sm { width: 30px; height: 30px; }
+.yt-np-ctrl:hover { background: rgba(255,255,255,0.24); border-color: rgba(255,255,255,0.3); }
+.yt-np-ctrl.active { color: rgba(167,139,250,1); background: rgba(167,139,250,0.25); border-color: rgba(167,139,250,0.5); }
+.yt-np-ctrl--sm { width: 32px; height: 32px; color: var(--text-dim); }
+.yt-np-ctrl--sm:hover { color: var(--text); }
 .yt-np-ctrl--lg {
-  width: 48px; height: 48px;
-  background: rgba(167,139,250,0.2); border-color: rgba(167,139,250,0.45);
-  color: rgba(167,139,250,1);
+  width: 52px; height: 52px;
+  background: rgba(167,139,250,0.28); border-color: rgba(167,139,250,0.55);
+  color: #fff; backdrop-filter: blur(16px);
 }
-.yt-np-ctrl--lg:hover { background: rgba(167,139,250,0.35); color: #fff; }
+.yt-np-ctrl--lg:hover { background: rgba(167,139,250,0.45); border-color: rgba(167,139,250,0.7); }
 .yt-loop-badge {
-  position: absolute; top: -4px; right: -4px;
+  position: absolute; top: -3px; right: -3px;
   font-size: 8px; font-weight: 700; color: rgba(167,139,250,1);
   line-height: 1; pointer-events: none;
 }
 .yt-np-ctrl--sm { position: relative; }
 .yt-np-ytlink {
   display: flex; align-items: center; gap: 5px;
-  font-size: 11px; color: var(--text-dimmer); text-decoration: none;
-  padding: 4px 10px; border-radius: 8px; border: 1px solid transparent;
-  transition: all var(--transition);
+  font-size: 11px; color: var(--text-dim); text-decoration: none;
+  padding: 5px 12px; border-radius: 10px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px); transition: all var(--transition);
 }
-.yt-np-ytlink:hover { color: var(--text); border-color: var(--panel-border); background: rgba(255,255,255,0.07); }
+.yt-np-ytlink:hover { color: var(--text); background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.28); }
 
 /* Active card in grid */
 .yt-card--active { outline: 1.5px solid rgba(167,139,250,0.7); background: rgba(167,139,250,0.08) !important; }
