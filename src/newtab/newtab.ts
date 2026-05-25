@@ -1,8 +1,8 @@
 import {
   getSettings, saveSettings, getDaily, saveDaily, getTodos, saveTodos,
-  getLinks, saveLinks, getNotes, saveNotes, getCountdowns, saveCountdowns,
+  getLinks, saveLinks, getFolders, saveFolders, getNotes, saveNotes, getCountdowns, saveCountdowns,
   getFocusHistory, logFocusSession, getCustomYtVideos, saveCustomYtVideos,
-  todayString, type Todo, type QuickLink, type Countdown, type WorldClock, type Settings,
+  todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
   type CustomYtVideo,
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
@@ -396,44 +396,126 @@ async function initTodos() {
 // ─── Quick Links ──────────────────────────────────────────────────────────────
 
 let links: QuickLink[] = [];
+let folders: QuickLinkFolder[] = [];
+const collapsedFolders = new Set<string>();
 
 function faviconUrl(url: string): string {
   try { return `https://www.google.com/s2/favicons?domain=${new URL(url).origin}&sz=32`; }
   catch { return ''; }
 }
 
+function buildLinkItem(link: QuickLink): HTMLLIElement {
+  const li = document.createElement('li');
+  li.className = 'link-item';
+  const a = document.createElement('a');
+  a.href = link.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+  const favicon = document.createElement('img');
+  favicon.src = faviconUrl(link.url); favicon.alt = '';
+  favicon.onerror = () => { favicon.style.display = 'none'; };
+  a.append(favicon, link.label);
+  const del = document.createElement('button');
+  del.className = 'link-del'; del.textContent = '✕'; del.title = 'Remove';
+  del.addEventListener('click', () => { links = links.filter(l => l.id !== link.id); saveLinks(links); renderLinks(); });
+  li.append(a, del);
+  return li;
+}
+
 function renderLinks() {
   const list = document.getElementById('links-list') as HTMLUListElement;
   list.innerHTML = '';
-  links.forEach((link) => {
-    const li = document.createElement('li');
-    li.className = 'link-item';
-    const a = document.createElement('a');
-    a.href = link.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    const favicon = document.createElement('img');
-    favicon.src = faviconUrl(link.url); favicon.alt = '';
-    favicon.onerror = () => { favicon.style.display = 'none'; };
-    a.append(favicon, link.label);
-    const del = document.createElement('button');
-    del.className = 'link-del'; del.textContent = '✕'; del.title = 'Remove';
-    del.addEventListener('click', () => { links = links.filter(l => l.id !== link.id); saveLinks(links); renderLinks(); });
-    li.append(a, del);
-    list.appendChild(li);
+
+  // Ungrouped links first
+  const ungrouped = links.filter(l => !l.folderId);
+  ungrouped.forEach(link => list.appendChild(buildLinkItem(link)));
+
+  // Folders
+  folders.forEach(folder => {
+    const folderLinks = links.filter(l => l.folderId === folder.id);
+    const collapsed = collapsedFolders.has(folder.id);
+
+    // Folder header row
+    const headerLi = document.createElement('li');
+    headerLi.className = 'link-folder-header';
+
+    const toggle = document.createElement('button');
+    toggle.className = 'link-folder-toggle';
+    toggle.innerHTML = `
+      <svg class="folder-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <path d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+      </svg>
+      <span class="link-folder-label">${folder.label}</span>
+      <span class="link-folder-count">${folderLinks.length}</span>
+      <svg class="link-folder-chevron${collapsed ? ' collapsed' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    `;
+    toggle.addEventListener('click', () => {
+      if (collapsedFolders.has(folder.id)) collapsedFolders.delete(folder.id);
+      else collapsedFolders.add(folder.id);
+      renderLinks();
+    });
+
+    const delFolder = document.createElement('button');
+    delFolder.className = 'link-del link-folder-del'; delFolder.textContent = '✕'; delFolder.title = 'Delete folder';
+    delFolder.addEventListener('click', () => {
+      // Move folder links to ungrouped
+      links = links.map(l => l.folderId === folder.id ? { ...l, folderId: undefined } : l);
+      folders = folders.filter(f => f.id !== folder.id);
+      saveFolders(folders); saveLinks(links); renderLinks(); syncFolderSelect();
+    });
+
+    headerLi.append(toggle, delFolder);
+    list.appendChild(headerLi);
+
+    if (!collapsed) {
+      folderLinks.forEach(link => {
+        const li = buildLinkItem(link);
+        li.classList.add('link-in-folder');
+        list.appendChild(li);
+      });
+    }
   });
 }
 
+function syncFolderSelect() {
+  const sel = document.getElementById('link-folder-sel') as HTMLSelectElement;
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">No folder</option>';
+  folders.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.id; opt.textContent = f.label;
+    sel.appendChild(opt);
+  });
+  sel.value = prev;
+}
+
 async function initLinks() {
-  links = await getLinks();
+  [links, folders] = await Promise.all([getLinks(), getFolders()]);
   renderLinks();
+
   const form = document.getElementById('link-form') as HTMLFormElement;
   const labelInput = document.getElementById('link-label') as HTMLInputElement;
   const urlInput = document.getElementById('link-url') as HTMLInputElement;
+  const folderSel = document.getElementById('link-folder-sel') as HTMLSelectElement;
+  const newFolderBtn = document.getElementById('btn-new-folder') as HTMLButtonElement;
+
+  syncFolderSelect();
+
+  // New folder
+  newFolderBtn?.addEventListener('click', () => {
+    const name = prompt('Folder name:')?.trim();
+    if (!name) return;
+    folders.push({ id: Date.now().toString(), label: name });
+    saveFolders(folders); renderLinks(); syncFolderSelect();
+  });
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const label = labelInput.value.trim(); const url = urlInput.value.trim();
     if (!label || !url) return;
-    links.push({ id: Date.now().toString(), label, url });
+    const folderId = folderSel?.value || undefined;
+    links.push({ id: Date.now().toString(), label, url, folderId });
     saveLinks(links); renderLinks(); labelInput.value = ''; urlInput.value = '';
+    if (folderSel) folderSel.value = '';
   });
 
   // Toggle panel
@@ -462,7 +544,6 @@ function initBookmarkImport() {
     }
     walk(tree);
 
-    // De-duplicate against existing links
     const existingUrls = new Set(links.map(l => l.url));
     const newLinks = flat.filter(l => !existingUrls.has(l.url)).slice(0, 30);
     links = [...links, ...newLinks];

@@ -35,6 +35,12 @@ export interface QuickLink {
   id: string;
   label: string;
   url: string;
+  folderId?: string;
+}
+
+export interface QuickLinkFolder {
+  id: string;
+  label: string;
 }
 
 export interface Countdown {
@@ -153,6 +159,15 @@ export async function getLinks(): Promise<QuickLink[]> {
 
 export async function saveLinks(links: QuickLink[]): Promise<void> {
   await chrome.storage.local.set({ mt_links: links });
+}
+
+export async function getFolders(): Promise<QuickLinkFolder[]> {
+  const result = await chrome.storage.local.get('mt_link_folders');
+  return (result['mt_link_folders'] as QuickLinkFolder[]) ?? [];
+}
+
+export async function saveFolders(folders: QuickLinkFolder[]): Promise<void> {
+  await chrome.storage.local.set({ mt_link_folders: folders });
 }
 
 export async function getWeatherCache(): Promise<WeatherCache | null> {

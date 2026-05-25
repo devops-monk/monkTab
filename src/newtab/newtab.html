@@ -249,6 +249,10 @@
     <div class="panel-header">
       <span>Quick Links</span>
       <div style="display:flex;gap:6px;align-items:center">
+        <button id="btn-new-folder" class="icon-btn-sm" title="New folder">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></svg>
+          Folder
+        </button>
         <button id="btn-bookmarks-import" class="icon-btn-sm" title="Import from bookmarks">📚 Import</button>
         <button id="btn-links-close" class="icon-btn-sm">✕</button>
       </div>
@@ -257,6 +261,7 @@
     <form id="link-form" class="link-form">
       <input id="link-label" type="text" placeholder="Label" maxlength="20" />
       <input id="link-url" type="url" placeholder="https://…" />
+      <select id="link-folder-sel" class="link-folder-sel"></select>
       <button type="submit">Add</button>
     </form>
   </aside>
