@@ -1289,14 +1289,11 @@ async function fetchCloudNews(): Promise<NewsItem[]> {
 
 function renderNewsSkeleton() {
   const feed = document.getElementById('news-feed')!;
-  feed.innerHTML = Array.from({ length: 8 }).map(() => `
+  feed.innerHTML = Array.from({ length: 7 }).map(() => `
     <div class="news-skeleton-card">
-      <div class="sk-accent"></div>
-      <div class="sk-body-wrap">
-        <div class="sk-line sk-title-1"></div>
-        <div class="sk-line sk-title-2"></div>
-        <div class="sk-line sk-meta"></div>
-      </div>
+      <div class="sk-line sk-title-1"></div>
+      <div class="sk-line sk-title-2"></div>
+      <div class="sk-line sk-meta"></div>
     </div>`).join('');
 }
 
@@ -1307,7 +1304,7 @@ function renderNewsCards(items: NewsItem[]) {
     return;
   }
   feed.innerHTML = '';
-  items.forEach((item, i) => {
+  items.forEach((item) => {
     const a = document.createElement('a');
     a.className = 'news-card';
     a.href = item.url;
@@ -1315,22 +1312,19 @@ function renderNewsCards(items: NewsItem[]) {
     a.rel = 'noopener noreferrer';
     const scoreColor = item.score >= 300 ? '#fb923c' : item.score >= 100 ? '#a78bfa' : '#4ade80';
     a.innerHTML = `
-      <div class="news-card-accent">${i + 1}</div>
-      <div class="news-card-body">
-        <div class="news-card-title">${item.title}</div>
-        <div class="news-card-meta">
-          <span class="news-score" style="color:${scoreColor};background:${scoreColor}1a">
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            ${item.score}
-          </span>
-          ${item.domain ? `<span class="news-sep">·</span><span class="news-domain">${item.domain}</span>` : ''}
-          <span class="news-sep">·</span>
-          <span class="news-time">${newsTimeAgo(item.time)}</span>
-          ${item.comments ? `<span class="news-comments">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            ${item.comments}
-          </span>` : ''}
-        </div>
+      <div class="news-card-title">${item.title}</div>
+      <div class="news-card-meta">
+        <span class="news-score" style="color:${scoreColor};background:${scoreColor}1a">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          ${item.score}
+        </span>
+        ${item.domain ? `<span class="news-sep">·</span><span class="news-domain">${item.domain}</span>` : ''}
+        <span class="news-sep">·</span>
+        <span class="news-time">${newsTimeAgo(item.time)}</span>
+        ${item.comments ? `<span class="news-comments">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          ${item.comments}
+        </span>` : ''}
       </div>`;
     feed.appendChild(a);
   });
