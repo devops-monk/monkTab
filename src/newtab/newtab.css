@@ -421,6 +421,23 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .icon-btn-sm { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; padding: 2px 4px; transition: color var(--transition); white-space: nowrap; }
 .icon-btn-sm:hover { color: var(--text); }
 
+.panel-action-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(167,139,250,0.12);
+  border: 1px solid rgba(167,139,250,0.3);
+  border-radius: 7px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px; font-weight: 600;
+  padding: 4px 9px;
+  transition: background var(--transition), border-color var(--transition);
+  white-space: nowrap;
+}
+.panel-action-btn:hover {
+  background: rgba(167,139,250,0.22);
+  border-color: rgba(167,139,250,0.55);
+}
+
 /* Pomodoro */
 .pomodoro-panel { text-align: center; }
 .pomo-header-tabs { display: flex; gap: 4px; justify-content: center; margin-bottom: 12px; background: rgba(255,255,255,0.06); border-radius: 9px; padding: 3px; }

@@ -163,7 +163,7 @@ export async function saveLinks(links: QuickLink[]): Promise<void> {
 
 export async function getFolders(): Promise<QuickLinkFolder[]> {
   const result = await chrome.storage.local.get('mt_link_folders');
-  return (result['mt_link_folders'] as QuickLinkFolder[]) ?? [];
+  return (result['mt_link_folders'] as QuickLinkFolder[]) ?? defaultFolders();
 }
 
 export async function saveFolders(folders: QuickLinkFolder[]): Promise<void> {
@@ -217,12 +217,14 @@ export async function logFocusSession(minutes: number): Promise<void> {
   await chrome.storage.local.set({ mt_focus_history: recent });
 }
 
+function defaultFolders(): QuickLinkFolder[] {
+  return [{ id: 'default', label: 'DevOps' }];
+}
+
 function defaultLinks(): QuickLink[] {
   return [
-    { id: '1', label: 'GitHub', url: 'https://github.com' },
-    { id: '2', label: 'DevOps-Monk', url: 'https://devops-monk.com' },
-    { id: '3', label: 'MonkKit', url: 'https://tools.devops-monk.com' },
-    { id: '4', label: 'AWS', url: 'https://console.aws.amazon.com' },
+    { id: '1', label: 'GitHub', url: 'https://github.com', folderId: 'default' },
+    { id: '2', label: 'AWS', url: 'https://console.aws.amazon.com', folderId: 'default' },
   ];
 }
 
