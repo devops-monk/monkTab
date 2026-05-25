@@ -27,6 +27,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8z"/></svg>
         News
       </button>
+      <button class="icon-btn" id="btn-market-toggle" title="Markets">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        Markets
+      </button>
     </div>
 
     <form id="search-form" class="search-form" autocomplete="off">
@@ -511,6 +515,7 @@
         <button class="sn-item" data-cat="clocks">World Clocks</button>
         <button class="sn-item" data-cat="github">GitHub</button>
         <button class="sn-item" data-cat="ai">AI</button>
+        <button class="sn-item" data-cat="markets">Markets</button>
         <div class="settings-nav-spacer"></div>
         <button id="btn-settings-save" class="sn-save-btn">Save & Close</button>
       </nav>
@@ -908,6 +913,38 @@
           </div>
         </section>
 
+        <!-- Markets -->
+        <section class="sc" data-cat="markets">
+          <h2 class="sc-title">Markets</h2>
+          <p class="sc-desc">Track crypto prices and stock watchlists</p>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Finnhub API key</span>
+                <span class="set-row-desc">Required for real-time stock quotes — get a free key at <strong>finnhub.io</strong></span>
+              </div>
+            </div>
+            <input id="set-finnhub-key" class="set-input set-input-full" type="password" placeholder="pk_live_…" autocomplete="off" />
+          </div>
+
+          <div class="set-card">
+            <div class="set-row-info" style="padding:0 0 10px">
+              <span class="set-row-title">Stock watchlist</span>
+              <span class="set-row-desc">Comma-separated ticker symbols (e.g. AAPL, NVDA, TSLA)</span>
+            </div>
+            <input id="set-market-stocks" class="set-input set-input-full" type="text" placeholder="AAPL, NVDA, GOOGL, MSFT, TSLA" autocomplete="off" />
+          </div>
+
+          <div class="set-card">
+            <div class="set-row-info" style="padding:0 0 10px">
+              <span class="set-row-title">Crypto watchlist</span>
+              <span class="set-row-desc">CoinGecko IDs (e.g. bitcoin, ethereum, solana)</span>
+            </div>
+            <input id="set-market-crypto" class="set-input set-input-full" type="text" placeholder="bitcoin, ethereum, solana, binancecoin" autocomplete="off" />
+          </div>
+        </section>
+
       </div><!-- end settings-content -->
     </div><!-- end settings-modal -->
   </div><!-- end settings-overlay -->
@@ -1053,6 +1090,126 @@
     <div class="fm-quote">
       <span id="fm-quote-text"></span>
     </div>
+  </div>
+
+  <!-- Market panel (slides up from bottom) -->
+  <div id="market-panel" class="market-panel hidden">
+
+    <div class="market-drag-handle"></div>
+
+    <div class="market-panel-header">
+      <div class="market-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <span class="market-panel-title">Markets</span>
+        <span id="market-last-updated" class="market-last-updated"></span>
+      </div>
+
+      <div class="market-tab-bar">
+        <button class="market-tab market-tab--active" data-mtab="overview">Overview</button>
+        <button class="market-tab" data-mtab="watchlist">Watchlist</button>
+        <button class="market-tab" data-mtab="portfolio">Portfolio</button>
+      </div>
+
+      <button id="btn-market-refresh" class="market-icon-btn" title="Refresh">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
+      </button>
+      <button id="btn-market-close" class="market-icon-btn market-icon-btn--close" title="Close">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Overview pane -->
+    <div id="market-pane-overview" class="market-pane">
+      <!-- Sentiment + Global stats row -->
+      <div class="market-summary-row">
+        <div id="market-fng" class="market-fng-card">
+          <span class="market-fng-label">Fear &amp; Greed</span>
+          <div class="market-fng-body">
+            <span id="market-fng-score" class="market-fng-score">—</span>
+            <div class="market-fng-bar-wrap">
+              <div id="market-fng-bar" class="market-fng-bar" style="width:0%"></div>
+            </div>
+            <span id="market-fng-class" class="market-fng-class">—</span>
+          </div>
+        </div>
+        <div class="market-global-stats">
+          <div class="market-stat-item">
+            <span class="market-stat-label">Market Cap</span>
+            <span id="mkt-cap" class="market-stat-val">—</span>
+            <span id="mkt-cap-chg" class="market-stat-chg">—</span>
+          </div>
+          <div class="market-stat-item">
+            <span class="market-stat-label">24h Volume</span>
+            <span id="mkt-vol" class="market-stat-val">—</span>
+          </div>
+          <div class="market-stat-item">
+            <span class="market-stat-label">BTC Dom.</span>
+            <span id="mkt-btc-dom" class="market-stat-val">—</span>
+          </div>
+        </div>
+      </div>
+      <!-- Top crypto cards -->
+      <div id="market-overview-grid" class="market-overview-grid"></div>
+    </div>
+
+    <!-- Watchlist pane -->
+    <div id="market-pane-watchlist" class="market-pane hidden">
+      <div id="market-watchlist-body" class="market-watchlist-body"></div>
+      <p id="market-no-key" class="market-no-key hidden">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Add your <strong>Finnhub API key</strong> in Settings → Markets to unlock stock quotes.
+      </p>
+    </div>
+
+    <!-- Portfolio pane -->
+    <div id="market-pane-portfolio" class="market-pane hidden">
+      <!-- Hero P&L summary -->
+      <div id="portfolio-hero" class="portfolio-hero hidden">
+        <div class="portfolio-hero-left">
+          <span class="portfolio-hero-label">Total Value</span>
+          <span id="portfolio-total-val" class="portfolio-total-val">$0.00</span>
+          <span id="portfolio-total-pnl" class="portfolio-total-pnl">—</span>
+        </div>
+        <div class="portfolio-hero-right">
+          <div class="portfolio-hero-stat">
+            <span class="portfolio-hero-stat-label">Invested</span>
+            <span id="portfolio-invested" class="portfolio-hero-stat-val">$0.00</span>
+          </div>
+          <div class="portfolio-hero-stat">
+            <span class="portfolio-hero-stat-label">All-time P&amp;L</span>
+            <span id="portfolio-alltime-pnl" class="portfolio-hero-stat-val">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Holdings table -->
+      <div id="portfolio-holdings" class="portfolio-holdings"></div>
+
+      <!-- Add holding -->
+      <button id="btn-portfolio-add-toggle" class="portfolio-add-toggle">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add holding
+      </button>
+      <form id="portfolio-add-form" class="portfolio-add-form hidden">
+        <div class="portfolio-form-row">
+          <select id="pf-type" class="portfolio-select">
+            <option value="crypto">Crypto</option>
+            <option value="stock">Stock</option>
+          </select>
+          <input id="pf-symbol" type="text" class="portfolio-input" placeholder="BTC / AAPL" maxlength="12" autocomplete="off" />
+          <input id="pf-coinid" type="text" class="portfolio-input" placeholder="CoinGecko ID (e.g. bitcoin)" autocomplete="off" />
+        </div>
+        <div class="portfolio-form-row">
+          <input id="pf-units" type="number" class="portfolio-input" placeholder="Units / Shares" min="0" step="any" />
+          <input id="pf-avgcost" type="number" class="portfolio-input" placeholder="Avg cost per unit ($)" min="0" step="any" />
+        </div>
+        <div class="portfolio-form-actions">
+          <button type="button" id="btn-portfolio-cancel" class="portfolio-btn-cancel">Cancel</button>
+          <button type="submit" class="portfolio-btn-submit">Add to Portfolio</button>
+        </div>
+      </form>
+    </div>
+
   </div>
 
   <!-- News panel (slides up from bottom) -->

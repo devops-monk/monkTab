@@ -21,6 +21,9 @@ export interface Settings {
   activeBackground: 'daily' | 'custom';
   activeCustomBg: number; // index into customBackgrounds
   locationOverride: string; // empty = use device GPS
+  finnhubKey: string;
+  marketWatchlistCrypto: string[];
+  marketWatchlistStocks: string[];
 }
 
 export interface Todo {
@@ -162,6 +165,9 @@ const DEFAULTS: Settings = {
   activeBackground: 'daily',
   activeCustomBg: 0,
   locationOverride: '',
+  finnhubKey: '',
+  marketWatchlistCrypto: ['bitcoin', 'ethereum', 'solana', 'binancecoin'],
+  marketWatchlistStocks: ['AAPL', 'NVDA', 'GOOGL', 'MSFT', 'TSLA'],
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -276,6 +282,24 @@ export async function getCustomYtVideos(): Promise<CustomYtVideo[]> {
 
 export async function saveCustomYtVideos(videos: CustomYtVideo[]): Promise<void> {
   await chrome.storage.local.set({ mt_yt_custom: videos });
+}
+
+export interface PortfolioHolding {
+  id: string;
+  symbol: string;          // display symbol, e.g. BTC, AAPL
+  type: 'crypto' | 'stock';
+  coinId?: string;         // CoinGecko ID for crypto (e.g. 'bitcoin')
+  units: number;           // shares or coins owned
+  avgCost: number;         // average cost per unit in USD
+}
+
+export async function getPortfolio(): Promise<PortfolioHolding[]> {
+  const result = await chrome.storage.local.get('mt_portfolio');
+  return (result['mt_portfolio'] as PortfolioHolding[]) ?? [];
+}
+
+export async function savePortfolio(holdings: PortfolioHolding[]): Promise<void> {
+  await chrome.storage.local.set({ mt_portfolio: holdings });
 }
 
 export function todayString(): string {

@@ -34,6 +34,12 @@
     "https://fastly.picsum.photos/*",
     "https://img.youtube.com/*",
     "https://www.youtube-nocookie.com/*",
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://api.coingecko.com/*",
+    "https://finnhub.io/*",
+    "https://api.alternative.me/*",
+    "https://hn.algolia.com/*",
+    "https://hacker-news.firebaseio.com/*",
+    "https://dev.to/*"
   ]
 }

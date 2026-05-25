@@ -4,7 +4,8 @@ import {
   getFocusHistory, logFocusSession, getCustomYtVideos, saveCustomYtVideos,
   getYtPlayState, saveYtPlayState, clearYtPlayState, getYtRecent, addYtRecent,
   todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
-  type CustomYtVideo, type YtPlayState,
+  type CustomYtVideo, type YtPlayState, type PortfolioHolding,
+  getPortfolio, savePortfolio,
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
 import { getBackground } from '../utils/background';
@@ -614,6 +615,498 @@ function initBookmarkImport() {
     renderLinks();
     alert(`Imported ${newLinks.length} bookmarks.`);
   });
+}
+
+// ─── Markets ──────────────────────────────────────────────────────────────────
+
+interface CoinData {
+  id: string;
+  symbol: string;
+  name: string;
+  current_price: number;
+  price_change_percentage_24h: number;
+  market_cap: number;
+  total_volume: number;
+  sparkline_in_7d: { price: number[] };
+}
+
+interface StockQuote {
+  symbol: string;
+  price: number;
+  change: number;
+  changePct: number;
+  high: number;
+  low: number;
+}
+
+const MARKET_CACHE_TTL = 5 * 60 * 1000; // 5 min
+let activeMarketTab = 'overview';
+
+function fmtPrice(n: number): string {
+  if (n >= 10000) return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (n >= 1) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return n.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+}
+
+function fmtLarge(n: number): string {
+  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  return `$${n.toFixed(0)}`;
+}
+
+function changeClass(pct: number): string { return pct >= 0 ? 'up' : 'down'; }
+function changeArrow(pct: number): string { return pct >= 0 ? '▲' : '▼'; }
+
+function sparklineSVG(data: number[], width: number, height: number, positive: boolean): string {
+  if (!data || data.length < 2) return '';
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const W = data.length - 1;
+  const H = 100; const pad = 6;
+  const pts = data.map((v, i) => ({ x: (i / W) * W, y: pad + (1 - (v - min) / range) * (H - pad * 2) }));
+
+  let line = pts.map((p, i) => `${i === 0 ? 'M' : 'C'} ${i === 0 ? `${p.x} ${p.y}` : `${(pts[i-1].x+p.x)/2} ${pts[i-1].y}, ${(pts[i-1].x+p.x)/2} ${p.y}, ${p.x} ${p.y}`}`).join(' ');
+  const fill = `${line} L ${W} ${H} L 0 ${H} Z`;
+  const color = positive ? '#4ade80' : '#f87171';
+  const fillAlpha = positive ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)';
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="${fill}" fill="${fillAlpha}" stroke="none"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+async function fetchCryptoMarkets(ids: string[]): Promise<CoinData[]> {
+  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(',')}&sparkline=true&price_change_percentage=24h&order=market_cap_desc`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  return r.json();
+}
+
+async function fetchCryptoGlobal(): Promise<{ market_cap_usd: number; volume_usd: number; btc_dominance: number; market_cap_change_pct: number }> {
+  const r = await fetch('https://api.coingecko.com/api/v3/global', { signal: AbortSignal.timeout(6000) });
+  const d = await r.json();
+  const data = d.data;
+  return {
+    market_cap_usd: data.total_market_cap?.usd ?? 0,
+    volume_usd: data.total_volume?.usd ?? 0,
+    btc_dominance: data.market_cap_percentage?.btc ?? 0,
+    market_cap_change_pct: data.market_cap_change_percentage_24h_usd ?? 0,
+  };
+}
+
+async function fetchFearGreed(): Promise<{ value: number; classification: string }> {
+  const r = await fetch('https://api.alternative.me/fng/?limit=1', { signal: AbortSignal.timeout(5000) });
+  const d = await r.json();
+  const entry = d?.data?.[0];
+  return { value: Number(entry?.value ?? 50), classification: entry?.value_classification ?? 'Neutral' };
+}
+
+async function fetchFinnhubQuote(symbol: string, key: string): Promise<StockQuote | null> {
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`, { signal: AbortSignal.timeout(6000) });
+    const d = await r.json();
+    if (!d || d.c === 0) return null;
+    return { symbol, price: d.c, change: d.d, changePct: d.dp, high: d.h, low: d.l };
+  } catch { return null; }
+}
+
+async function fetchFinnhubCandles(symbol: string, key: string): Promise<number[]> {
+  const to = Math.floor(Date.now() / 1000);
+  const from = to - 30 * 86400;
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${key}`, { signal: AbortSignal.timeout(6000) });
+    const d = await r.json();
+    return d?.s === 'ok' ? (d.c as number[]) : [];
+  } catch { return []; }
+}
+
+function renderMarketOverviewSkeleton() {
+  const grid = document.getElementById('market-overview-grid')!;
+  grid.innerHTML = `<div class="market-sk-card"></div><div class="market-sk-card"></div><div class="market-sk-card"></div>`;
+}
+
+function renderMarketWatchlistSkeleton() {
+  const body = document.getElementById('market-watchlist-body')!;
+  body.innerHTML = Array.from({ length: 6 }).map(() => `<div class="market-sk-row"></div>`).join('');
+}
+
+function renderFearGreed(value: number, label: string) {
+  const scoreEl = document.getElementById('market-fng-score')!;
+  const barEl = document.getElementById('market-fng-bar')!;
+  const classEl = document.getElementById('market-fng-class')!;
+  scoreEl.textContent = String(value);
+  barEl.style.width = `${value}%`;
+  // Color the score by zone
+  const color = value <= 25 ? '#f87171' : value <= 45 ? '#fb923c' : value <= 55 ? '#facc15' : value <= 75 ? '#4ade80' : '#22d3ee';
+  scoreEl.style.color = color;
+  classEl.textContent = label;
+  classEl.style.color = color;
+}
+
+function renderGlobalStats(data: { market_cap_usd: number; volume_usd: number; btc_dominance: number; market_cap_change_pct: number }) {
+  const cap = document.getElementById('mkt-cap')!;
+  const capChg = document.getElementById('mkt-cap-chg')!;
+  const vol = document.getElementById('mkt-vol')!;
+  const btcDom = document.getElementById('mkt-btc-dom')!;
+  cap.textContent = fmtLarge(data.market_cap_usd);
+  const pct = data.market_cap_change_pct;
+  capChg.textContent = `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}%`;
+  capChg.style.color = pct >= 0 ? '#4ade80' : '#f87171';
+  vol.textContent = fmtLarge(data.volume_usd);
+  btcDom.textContent = `${data.btc_dominance.toFixed(1)}%`;
+}
+
+function renderOverviewGrid(coins: CoinData[]) {
+  const grid = document.getElementById('market-overview-grid')!;
+  grid.innerHTML = '';
+  coins.slice(0, 3).forEach(c => {
+    const pct = c.price_change_percentage_24h;
+    const pos = pct >= 0;
+    const spark = sparklineSVG(c.sparkline_in_7d?.price ?? [], 88, 36, pos);
+    const card = document.createElement('a');
+    card.className = 'market-asset-card';
+    card.href = `https://www.coingecko.com/en/coins/${c.id}`;
+    card.target = '_blank'; card.rel = 'noopener noreferrer';
+    card.innerHTML = `
+      <div class="market-asset-top">
+        <div class="market-asset-info">
+          <span class="market-asset-symbol">${c.symbol.toUpperCase()}</span>
+          <span class="market-asset-name">${c.name}</span>
+        </div>
+        <div class="market-asset-sparkline">${spark}</div>
+      </div>
+      <div class="market-asset-price-row">
+        <span class="market-asset-price">$${fmtPrice(c.current_price)}</span>
+        <span class="market-asset-change ${changeClass(pct)}">${changeArrow(pct)} ${Math.abs(pct).toFixed(2)}%</span>
+      </div>
+      <div class="market-asset-meta">Vol ${fmtLarge(c.total_volume)} · MCap ${fmtLarge(c.market_cap)}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+function renderWatchlistSection(title: string, rows: HTMLElement[]) {
+  const body = document.getElementById('market-watchlist-body')!;
+  if (rows.length === 0) return;
+  const hdr = document.createElement('div');
+  hdr.className = 'market-section-header';
+  hdr.textContent = title;
+  body.appendChild(hdr);
+  rows.forEach(r => body.appendChild(r));
+}
+
+function buildCryptoRow(c: CoinData): HTMLElement {
+  const pct = c.price_change_percentage_24h;
+  const pos = pct >= 0;
+  const spark = sparklineSVG(c.sparkline_in_7d?.price ?? [], 72, 28, pos);
+  const a = document.createElement('a');
+  a.className = 'market-watchlist-row';
+  a.href = `https://www.coingecko.com/en/coins/${c.id}`;
+  a.target = '_blank'; a.rel = 'noopener noreferrer';
+  a.innerHTML = `
+    <span class="market-row-type crypto">CRYPTO</span>
+    <div class="market-row-left">
+      <span class="market-row-symbol">${c.symbol.toUpperCase()}</span>
+      <span class="market-row-name">${c.name}</span>
+    </div>
+    <span class="market-row-price">$${fmtPrice(c.current_price)}</span>
+    <span class="market-row-change ${changeClass(pct)}">${changeArrow(pct)} ${Math.abs(pct).toFixed(2)}%</span>
+    <div class="market-row-sparkline">${spark}</div>`;
+  return a;
+}
+
+function buildStockRow(q: StockQuote, candles: number[]): HTMLElement {
+  const pos = q.changePct >= 0;
+  const spark = sparklineSVG(candles, 72, 28, pos);
+  const a = document.createElement('a');
+  a.className = 'market-watchlist-row';
+  a.href = `https://finance.yahoo.com/quote/${q.symbol}`;
+  a.target = '_blank'; a.rel = 'noopener noreferrer';
+  a.innerHTML = `
+    <span class="market-row-type stock">STOCK</span>
+    <div class="market-row-left">
+      <span class="market-row-symbol">${q.symbol}</span>
+      <span class="market-row-name">H ${fmtPrice(q.high)} · L ${fmtPrice(q.low)}</span>
+    </div>
+    <span class="market-row-price">$${fmtPrice(q.price)}</span>
+    <span class="market-row-change ${changeClass(q.changePct)}">${changeArrow(q.changePct)} ${Math.abs(q.changePct).toFixed(2)}%</span>
+    <div class="market-row-sparkline">${spark}</div>`;
+  return a;
+}
+
+function setMarketLastUpdated() {
+  const el = document.getElementById('market-last-updated')!;
+  el.textContent = `· ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+async function loadMarketOverview(force = false) {
+  const cacheKey = 'mt_market_overview';
+  if (!force) {
+    const cached = await chrome.storage.local.get(cacheKey);
+    const entry = cached[cacheKey] as { coins: CoinData[]; global: any; fng: any; cachedAt: number } | undefined;
+    if (entry && Date.now() - entry.cachedAt < MARKET_CACHE_TTL) {
+      renderFearGreed(entry.fng.value, entry.fng.classification);
+      renderGlobalStats(entry.global);
+      renderOverviewGrid(entry.coins);
+      return;
+    }
+  }
+  renderMarketOverviewSkeleton();
+  try {
+    const [coins, global, fng] = await Promise.all([
+      fetchCryptoMarkets(['bitcoin', 'ethereum', 'solana']),
+      fetchCryptoGlobal(),
+      fetchFearGreed(),
+    ]);
+    renderFearGreed(fng.value, fng.classification);
+    renderGlobalStats(global);
+    renderOverviewGrid(coins);
+    await chrome.storage.local.set({ [cacheKey]: { coins, global, fng, cachedAt: Date.now() } });
+    setMarketLastUpdated();
+  } catch {
+    document.getElementById('market-overview-grid')!.innerHTML = '<p class="market-error">Failed to load market data.</p>';
+  }
+}
+
+async function loadMarketWatchlist(settings: Settings, force = false) {
+  const body = document.getElementById('market-watchlist-body')!;
+  const noKeyEl = document.getElementById('market-no-key')!;
+  body.innerHTML = ''; noKeyEl.classList.add('hidden');
+
+  const cacheKey = 'mt_market_watchlist';
+  if (!force) {
+    const cached = await chrome.storage.local.get(cacheKey);
+    const entry = cached[cacheKey] as { cryptoRows: CoinData[]; stockRows: { q: StockQuote; c: number[] }[]; cachedAt: number } | undefined;
+    if (entry && Date.now() - entry.cachedAt < MARKET_CACHE_TTL) {
+      renderWatchlistSection('Crypto', entry.cryptoRows.map(buildCryptoRow));
+      if (entry.stockRows.length) renderWatchlistSection('Stocks', entry.stockRows.map(r => buildStockRow(r.q, r.c)));
+      else if (!settings.finnhubKey) noKeyEl.classList.remove('hidden');
+      return;
+    }
+  }
+
+  renderMarketWatchlistSkeleton();
+
+  const cryptoIds = settings.marketWatchlistCrypto.length ? settings.marketWatchlistCrypto : ['bitcoin', 'ethereum', 'solana'];
+  const stockSymbols = settings.marketWatchlistStocks.length ? settings.marketWatchlistStocks : [];
+
+  try {
+    const cryptoCoins = await fetchCryptoMarkets(cryptoIds);
+    body.innerHTML = '';
+    renderWatchlistSection('Crypto', cryptoCoins.map(buildCryptoRow));
+
+    if (settings.finnhubKey && stockSymbols.length) {
+      const stockResults = await Promise.all(
+        stockSymbols.map(async sym => {
+          const [q, c] = await Promise.all([
+            fetchFinnhubQuote(sym, settings.finnhubKey),
+            fetchFinnhubCandles(sym, settings.finnhubKey),
+          ]);
+          return q ? { q, c } : null;
+        })
+      );
+      const valid = stockResults.filter(Boolean) as { q: StockQuote; c: number[] }[];
+      if (valid.length) renderWatchlistSection('Stocks', valid.map(r => buildStockRow(r.q, r.c)));
+      await chrome.storage.local.set({ [cacheKey]: { cryptoRows: cryptoCoins, stockRows: valid, cachedAt: Date.now() } });
+    } else {
+      if (!settings.finnhubKey) noKeyEl.classList.remove('hidden');
+      await chrome.storage.local.set({ [cacheKey]: { cryptoRows: cryptoCoins, stockRows: [], cachedAt: Date.now() } });
+    }
+    setMarketLastUpdated();
+  } catch {
+    body.innerHTML = '<p class="market-error">Failed to load watchlist.</p>';
+  }
+}
+
+// ─── Portfolio ────────────────────────────────────────────────────────────────
+
+let portfolio: PortfolioHolding[] = [];
+
+async function loadPortfolio(settings: Settings) {
+  portfolio = await getPortfolio();
+  await renderPortfolio(settings);
+}
+
+async function renderPortfolio(settings: Settings) {
+  const heroEl = document.getElementById('portfolio-hero')!;
+  const holdingsEl = document.getElementById('portfolio-holdings')!;
+
+  if (portfolio.length === 0) {
+    heroEl.classList.add('hidden');
+    holdingsEl.innerHTML = '<p class="portfolio-empty">No holdings yet. Add your first position below.</p>';
+    return;
+  }
+  heroEl.classList.remove('hidden');
+  holdingsEl.innerHTML = '';
+
+  // Fetch live prices for all holdings
+  const cryptoIds = portfolio.filter(h => h.type === 'crypto' && h.coinId).map(h => h.coinId!);
+  const stockSymbols = portfolio.filter(h => h.type === 'stock').map(h => h.symbol);
+
+  let cryptoPrices: Record<string, number> = {};
+  let stockPrices: Record<string, number> = {};
+
+  try {
+    if (cryptoIds.length) {
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${cryptoIds.join(',')}&vs_currencies=usd`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const d = await r.json();
+      cryptoIds.forEach(id => { cryptoPrices[id] = d[id]?.usd ?? 0; });
+    }
+    if (stockSymbols.length && settings.finnhubKey) {
+      const quotes = await Promise.all(stockSymbols.map(s => fetchFinnhubQuote(s, settings.finnhubKey)));
+      quotes.forEach(q => { if (q) stockPrices[q.symbol] = q.price; });
+    }
+  } catch { /* prices stay 0 */ }
+
+  let totalValue = 0, totalCost = 0;
+  // Table header
+  const hdr = document.createElement('div');
+  hdr.className = 'portfolio-table-header';
+  hdr.innerHTML = `<span class="portfolio-th">Asset</span><span class="portfolio-th">Units</span><span class="portfolio-th">Avg Cost</span><span class="portfolio-th">Price</span><span class="portfolio-th">Value / P&L</span><span class="portfolio-th"></span>`;
+  holdingsEl.appendChild(hdr);
+
+  for (const h of portfolio) {
+    const curPrice = h.type === 'crypto' ? (cryptoPrices[h.coinId ?? ''] ?? 0) : (stockPrices[h.symbol] ?? 0);
+    const value = curPrice * h.units;
+    const cost = h.avgCost * h.units;
+    const pnl = value - cost;
+    const pnlPct = cost > 0 ? ((value - cost) / cost) * 100 : 0;
+    totalValue += value; totalCost += cost;
+
+    const priceKnown = curPrice > 0;
+    const pnlClass = pnl >= 0 ? 'up' : 'down';
+    const pnlSign = pnl >= 0 ? '+' : '';
+
+    const row = document.createElement('div');
+    row.className = 'portfolio-row';
+    row.innerHTML = `
+      <div class="portfolio-col-symbol">
+        <span class="portfolio-symbol">${h.symbol}</span>
+        <span class="portfolio-type-badge ${h.type}">${h.type}</span>
+      </div>
+      <div class="portfolio-col">
+        <span class="portfolio-col-label">Units</span>
+        <span class="portfolio-col-val">${h.units}</span>
+      </div>
+      <div class="portfolio-col">
+        <span class="portfolio-col-label">Avg Cost</span>
+        <span class="portfolio-col-val">$${fmtPrice(h.avgCost)}</span>
+      </div>
+      <div class="portfolio-col">
+        <span class="portfolio-col-label">Price</span>
+        <span class="portfolio-col-val">${priceKnown ? '$' + fmtPrice(curPrice) : '—'}</span>
+      </div>
+      <div class="portfolio-col">
+        <span class="portfolio-col-label">Value / P&L</span>
+        <span class="portfolio-col-val">${priceKnown ? '$' + fmtPrice(value) : '—'}</span>
+        ${priceKnown ? `<span class="portfolio-col-val ${pnlClass}">${pnlSign}${pnlPct.toFixed(2)}%</span>` : ''}
+      </div>
+      <button class="portfolio-del-btn" data-id="${h.id}" title="Remove">✕</button>`;
+    holdingsEl.appendChild(row);
+  }
+
+  // Delete buttons
+  holdingsEl.querySelectorAll<HTMLButtonElement>('.portfolio-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      portfolio = portfolio.filter(h => h.id !== btn.dataset['id']);
+      await savePortfolio(portfolio);
+      renderPortfolio(settings);
+    });
+  });
+
+  // Hero totals
+  const totalPnl = totalValue - totalCost;
+  const totalPnlPct = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0;
+  const pnlColor = totalPnl >= 0 ? '#4ade80' : '#f87171';
+  const pnlSign = totalPnl >= 0 ? '+' : '';
+
+  document.getElementById('portfolio-total-val')!.textContent = '$' + fmtPrice(totalValue);
+  const pnlEl = document.getElementById('portfolio-total-pnl')!;
+  pnlEl.textContent = `${pnlSign}$${fmtPrice(Math.abs(totalPnl))} (${pnlSign}${totalPnlPct.toFixed(2)}%)`;
+  pnlEl.style.color = pnlColor;
+  document.getElementById('portfolio-invested')!.textContent = '$' + fmtPrice(totalCost);
+  const atPnlEl = document.getElementById('portfolio-alltime-pnl')!;
+  atPnlEl.textContent = `${pnlSign}$${fmtPrice(Math.abs(totalPnl))}`;
+  atPnlEl.style.color = pnlColor;
+}
+
+function initPortfolioForm(settings: Settings) {
+  const form = document.getElementById('portfolio-add-form') as HTMLFormElement;
+  const toggleBtn = document.getElementById('btn-portfolio-add-toggle') as HTMLButtonElement;
+  const cancelBtn = document.getElementById('btn-portfolio-cancel') as HTMLButtonElement;
+  const typeEl = document.getElementById('pf-type') as HTMLSelectElement;
+  const coinIdRow = document.getElementById('pf-coinid') as HTMLInputElement;
+
+  function showForm() { form.classList.remove('hidden'); toggleBtn.classList.add('hidden'); }
+  function hideForm() {
+    form.classList.add('hidden'); toggleBtn.classList.remove('hidden');
+    form.reset();
+  }
+  toggleBtn.addEventListener('click', showForm);
+  cancelBtn.addEventListener('click', hideForm);
+
+  // Hide coin ID field for stocks
+  typeEl.addEventListener('change', () => {
+    coinIdRow.style.display = typeEl.value === 'crypto' ? '' : 'none';
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const symbol = (document.getElementById('pf-symbol') as HTMLInputElement).value.trim().toUpperCase();
+    const type = typeEl.value as 'crypto' | 'stock';
+    const coinId = (document.getElementById('pf-coinid') as HTMLInputElement).value.trim().toLowerCase() || undefined;
+    const units = parseFloat((document.getElementById('pf-units') as HTMLInputElement).value);
+    const avgCost = parseFloat((document.getElementById('pf-avgcost') as HTMLInputElement).value);
+    if (!symbol || isNaN(units) || isNaN(avgCost) || units <= 0) return;
+    const holding: PortfolioHolding = { id: Date.now().toString(), symbol, type, coinId, units, avgCost };
+    portfolio.push(holding);
+    await savePortfolio(portfolio);
+    hideForm();
+    renderPortfolio(settings);
+  });
+}
+
+function initMarkets(settings: Settings) {
+  const panel = document.getElementById('market-panel')!;
+  const panes = { overview: 'market-pane-overview', watchlist: 'market-pane-watchlist', portfolio: 'market-pane-portfolio' };
+
+  function switchPane(tab: string) {
+    Object.entries(panes).forEach(([key, id]) =>
+      document.getElementById(id)?.classList.toggle('hidden', key !== tab));
+  }
+
+  function openMarket() {
+    document.getElementById('news-panel')?.classList.remove('open');
+    panel.classList.remove('hidden');
+    requestAnimationFrame(() => panel.classList.add('open'));
+  }
+
+  document.getElementById('btn-market-toggle')?.addEventListener('click', () => {
+    const opening = !panel.classList.contains('open');
+    if (opening) { openMarket(); loadMarketOverview(); }
+    else panel.classList.remove('open');
+  });
+
+  document.getElementById('btn-market-close')?.addEventListener('click', () => panel.classList.remove('open'));
+
+  document.getElementById('btn-market-refresh')?.addEventListener('click', () => {
+    if (activeMarketTab === 'overview') loadMarketOverview(true);
+    else if (activeMarketTab === 'watchlist') loadMarketWatchlist(settings, true);
+    else renderPortfolio(settings);
+  });
+
+  panel.querySelectorAll<HTMLButtonElement>('.market-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset['mtab']!;
+      if (tab === activeMarketTab) return;
+      activeMarketTab = tab;
+      panel.querySelectorAll('.market-tab').forEach(t => t.classList.remove('market-tab--active'));
+      btn.classList.add('market-tab--active');
+      switchPane(tab);
+      if (tab === 'overview') loadMarketOverview();
+      else if (tab === 'watchlist') loadMarketWatchlist(settings);
+      else loadPortfolio(settings);
+    });
+  });
+
+  initPortfolioForm(settings);
 }
 
 // ─── News ─────────────────────────────────────────────────────────────────────
@@ -2314,6 +2807,9 @@ function initSettingsPanel(settings: Settings) {
   (document.getElementById('set-unsplash') as HTMLInputElement).value = settings.unsplashKey;
   (document.getElementById('set-gh-user') as HTMLInputElement).value = settings.githubUsername;
   (document.getElementById('set-gh-token') as HTMLInputElement).value = settings.githubToken;
+  (document.getElementById('set-finnhub-key') as HTMLInputElement).value = settings.finnhubKey ?? '';
+  (document.getElementById('set-market-stocks') as HTMLInputElement).value = (settings.marketWatchlistStocks ?? []).join(', ');
+  (document.getElementById('set-market-crypto') as HTMLInputElement).value = (settings.marketWatchlistCrypto ?? []).join(', ');
   aiSelect.value = settings.aiProvider;
 
   // Sync AI provider radio
@@ -2357,6 +2853,9 @@ function initSettingsPanel(settings: Settings) {
       unsplashKey: (document.getElementById('set-unsplash') as HTMLInputElement).value.trim(),
       githubUsername: (document.getElementById('set-gh-user') as HTMLInputElement).value.trim(),
       githubToken: (document.getElementById('set-gh-token') as HTMLInputElement).value.trim(),
+      finnhubKey: (document.getElementById('set-finnhub-key') as HTMLInputElement).value.trim(),
+      marketWatchlistStocks: (document.getElementById('set-market-stocks') as HTMLInputElement).value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
+      marketWatchlistCrypto: (document.getElementById('set-market-crypto') as HTMLInputElement).value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
       aiProvider: aiSelect.value as 'claude' | 'chatgpt' | 'gemini',
       worldClocks: clonedClocks.filter(c => c.label && c.timezone),
       customBackgrounds: settings.customBackgrounds,
@@ -2436,6 +2935,7 @@ async function init() {
   await initCountdowns();
   initBookmarkImport();
   initNews();
+  initMarkets(settings);
   initPomodoro();
   initFocusMode();
   initQuoteRefresh();
