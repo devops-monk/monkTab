@@ -1185,30 +1185,90 @@ async function fetchHNRising(): Promise<NewsItem[]> {
   })).filter((i: NewsItem) => i.title);
 }
 
-async function fetchDevOpsNews(): Promise<NewsItem[]> {
-  const r = await fetch(
-    'https://dev.to/api/articles?tags=devops,kubernetes,docker&top=3&per_page=20',
-    { signal: AbortSignal.timeout(7000) }
-  );
-  const data: any[] = await r.json();
-  return data.map(a => ({
-    id: a.id,
-    title: a.title ?? '',
-    url: a.url ?? `https://dev.to${a.path ?? ''}`,
-    score: a.public_reactions_count ?? 0,
-    by: a.user?.name ?? a.user?.username ?? '',
-    time: Math.floor(new Date(a.published_at).getTime() / 1000),
-    comments: a.comments_count ?? 0,
-    domain: 'dev.to',
-  })).filter(i => i.title);
+async function fetchHNByQuery(query: string, days = 7, minPoints = 20): Promise<NewsItem[]> {
+  const since = Math.floor(Date.now() / 1000) - days * 86400;
+  const url = `https://hn.algolia.com/api/v1/search?tags=story&query=${encodeURIComponent(query)}&numericFilters=points>${minPoints},created_at_i>${since}&hitsPerPage=25`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(7000) });
+  const data = await r.json();
+  return (data.hits ?? []).map((h: any) => ({
+    id: h.objectID,
+    title: h.title ?? h.story_title ?? '',
+    url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,
+    score: h.points ?? 0,
+    by: h.author ?? '',
+    time: Math.floor(new Date(h.created_at).getTime() / 1000),
+    comments: h.num_comments ?? 0,
+    domain: h.url ? newsExtractDomain(h.url) : 'news.ycombinator.com',
+  })).filter((i: NewsItem) => i.title);
+}
+
+async function fetchAINews(): Promise<NewsItem[]> {
+  // Merge two HN queries for broader AI coverage
+  const [general, models] = await Promise.allSettled([
+    fetchHNByQuery('AI LLM GPT Claude OpenAI Anthropic Gemini model', 7, 30),
+    fetchHNByQuery('machine learning neural network transformer', 7, 40),
+  ]);
+  const all = [
+    ...(general.status === 'fulfilled' ? general.value : []),
+    ...(models.status === 'fulfilled' ? models.value : []),
+  ];
+  const seen = new Set<string>();
+  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+}
+
+async function fetchReleasesNews(): Promise<NewsItem[]> {
+  const [releases, show] = await Promise.allSettled([
+    fetchHNByQuery('release version React Java Spring Python Rust Go TypeScript Next.js', 14, 20),
+    fetchHNByQuery('Show HN new version framework library open source released', 7, 10),
+  ]);
+  const all = [
+    ...(releases.status === 'fulfilled' ? releases.value : []),
+    ...(show.status === 'fulfilled' ? show.value : []),
+  ];
+  const seen = new Set<string>();
+  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+}
+
+async function fetchSecurityNews(): Promise<NewsItem[]> {
+  const [cve, breach] = await Promise.allSettled([
+    fetchHNByQuery('CVE vulnerability exploit zero-day patch security advisory', 14, 15),
+    fetchHNByQuery('data breach hack ransomware malware phishing attack', 7, 30),
+  ]);
+  const all = [
+    ...(cve.status === 'fulfilled' ? cve.value : []),
+    ...(breach.status === 'fulfilled' ? breach.value : []),
+  ];
+  const seen = new Set<string>();
+  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+}
+
+async function fetchCloudNews(): Promise<NewsItem[]> {
+  const [cloud, devops] = await Promise.allSettled([
+    fetchHNByQuery('AWS Azure GCP cloud infrastructure serverless lambda S3 EKS', 7, 25),
+    fetchHNByQuery('Kubernetes Docker DevOps CI/CD microservices architecture design pattern', 7, 25),
+  ]);
+  const all = [
+    ...(cloud.status === 'fulfilled' ? cloud.value : []),
+    ...(devops.status === 'fulfilled' ? devops.value : []),
+  ];
+  const seen = new Set<string>();
+  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
 }
 
 function renderNewsSkeleton() {
   const feed = document.getElementById('news-feed')!;
-  feed.innerHTML = Array.from({ length: 7 }).map(() => `
+  feed.innerHTML = Array.from({ length: 8 }).map(() => `
     <div class="news-skeleton-card">
-      <div class="sk-line sk-rank"></div>
-      <div class="sk-body">
+      <div class="sk-accent"></div>
+      <div class="sk-body-wrap">
         <div class="sk-line sk-title-1"></div>
         <div class="sk-line sk-title-2"></div>
         <div class="sk-line sk-meta"></div>
@@ -1229,10 +1289,9 @@ function renderNewsCards(items: NewsItem[]) {
     a.href = item.url;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
-    // Score colour: orange 300+, purple 100+, green otherwise
     const scoreColor = item.score >= 300 ? '#fb923c' : item.score >= 100 ? '#a78bfa' : '#4ade80';
     a.innerHTML = `
-      <div class="news-card-rank">${i + 1}</div>
+      <div class="news-card-accent">${i + 1}</div>
       <div class="news-card-body">
         <div class="news-card-title">${item.title}</div>
         <div class="news-card-meta">
@@ -1273,7 +1332,10 @@ async function loadNews(tab: string, force = false) {
     let items: NewsItem[];
     if (tab === 'top') items = await fetchHNTop();
     else if (tab === 'rising') items = await fetchHNRising();
-    else items = await fetchDevOpsNews();
+    else if (tab === 'ai') items = await fetchAINews();
+    else if (tab === 'releases') items = await fetchReleasesNews();
+    else if (tab === 'security') items = await fetchSecurityNews();
+    else items = await fetchCloudNews();
     renderNewsCards(items);
     await chrome.storage.local.set({ [cacheKey]: { items, cachedAt: Date.now() } });
   } catch {
@@ -1302,6 +1364,7 @@ function initNews() {
     loadNews(activeNewsTab, true);
   });
 
+  const feedEl = document.getElementById('news-feed')!;
   panel.querySelectorAll<HTMLButtonElement>('.news-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset['ntab']!;
@@ -1309,6 +1372,7 @@ function initNews() {
       activeNewsTab = tab;
       panel.querySelectorAll('.news-tab').forEach(t => t.classList.remove('news-tab--active'));
       btn.classList.add('news-tab--active');
+      feedEl.dataset['newsActive'] = tab;
       loadNews(tab);
     });
   });
