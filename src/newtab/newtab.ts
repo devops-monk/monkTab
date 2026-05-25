@@ -2,7 +2,7 @@ import {
   getSettings, saveSettings, getDaily, saveDaily, getTodos, saveTodos,
   getLinks, saveLinks, getFolders, saveFolders, getNotes, saveNotes, getCountdowns, saveCountdowns,
   getFocusHistory, logFocusSession, getCustomYtVideos, saveCustomYtVideos,
-  getYtPlayState, saveYtPlayState, clearYtPlayState,
+  getYtPlayState, saveYtPlayState, clearYtPlayState, getYtRecent, addYtRecent,
   todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
   type CustomYtVideo, type YtPlayState,
 } from '../utils/storage';
@@ -919,26 +919,117 @@ function buildYtCard(
   return card;
 }
 
-// Shared playlist state
+// ─── YouTube state ────────────────────────────────────────────────────────────
+
 let ytPlaylist: Array<{ id: string; title: string; ch: string }> = [];
 let ytCurrentIdx = -1;
 let activeYtIframe: HTMLIFrameElement | null = null;
-let activeYtTitleEl: HTMLElement | null = null;
-let activeYtOpenLink: HTMLAnchorElement | null = null;
 let activeYtUpdateFn: ((label: string | null) => void) | null = null;
-let activeYtPlayerView: HTMLElement | null = null;
-let activeYtGrid: HTMLElement | null = null;
-let activeYtNowPlayingBar: HTMLElement | null = null;
-let activeYtNowPlayingTitle: HTMLElement | null = null;
 let activeYtTitle = '';
 let activeYtCh = '';
+let activeYtId = '';
 let ytPlayStartedAt = 0;
+let ytIsPaused = false;
 
 // Playback modes
 let ytShuffle = false;
 let ytLoopMode: 'all' | 'one' | 'none' = 'all';
 let ytShuffledIndices: number[] = [];
 let ytShufflePos = -1;
+
+// Now Playing pane DOM refs (set in initYouTubeBeats)
+let ytNpThumb: HTMLImageElement | null = null;
+let ytNpTrack: HTMLElement | null = null;
+let ytNpChannel: HTMLElement | null = null;
+let ytNpYtLink: HTMLAnchorElement | null = null;
+let ytNpPausePlayBtn: HTMLButtonElement | null = null;
+let ytNpPauseIcon: SVGElement | null = null;
+let ytNpPlayIcon: SVGElement | null = null;
+let ytActivePane = 'library';
+
+// Visualizer
+let vizRaf = 0;
+const VIZ_BARS = 26;
+const vizH = new Float32Array(VIZ_BARS).fill(0.04);
+const vizT = new Float32Array(VIZ_BARS).fill(0.04);
+
+function startVisualizer(canvas: HTMLCanvasElement) {
+  cancelAnimationFrame(vizRaf);
+  const ctx2d = canvas.getContext('2d')!;
+  const W = canvas.width, H = canvas.height;
+  for (let i = 0; i < VIZ_BARS; i++) vizT[i] = 0.05 + Math.random() * 0.95;
+  function frame() {
+    ctx2d.clearRect(0, 0, W, H);
+    const bw = W / VIZ_BARS;
+    for (let i = 0; i < VIZ_BARS; i++) {
+      vizH[i] += (vizT[i] - vizH[i]) * 0.1;
+      if (Math.abs(vizH[i] - vizT[i]) < 0.008) {
+        const max = ytIsPaused ? 0.14 : 1.0;
+        const min = ytIsPaused ? 0.02 : 0.04;
+        vizT[i] = min + Math.random() * (max - min);
+      }
+      const h = Math.max(2, vizH[i] * H);
+      const x = i * bw + 1.5;
+      const grad = ctx2d.createLinearGradient(0, H - h, 0, H);
+      grad.addColorStop(0, 'rgba(167,139,250,0.95)');
+      grad.addColorStop(1, 'rgba(109,40,217,0.45)');
+      ctx2d.fillStyle = grad;
+      ctx2d.beginPath();
+      ctx2d.roundRect(x, H - h, bw - 3, h, [3, 3, 1, 1]);
+      ctx2d.fill();
+    }
+    vizRaf = requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+function stopVisualizer() { cancelAnimationFrame(vizRaf); vizRaf = 0; }
+
+function updatePausePlayUI() {
+  ytNpPauseIcon?.classList.toggle('hidden', ytIsPaused);
+  ytNpPlayIcon?.classList.toggle('hidden', !ytIsPaused);
+  if (ytNpPausePlayBtn) ytNpPausePlayBtn.title = ytIsPaused ? 'Play' : 'Pause';
+}
+
+function switchYtPane(pane: string) {
+  ytActivePane = pane;
+  ['library', 'recent', 'nowplaying'].forEach(p => {
+    document.getElementById(`yt-pane-${p}`)?.classList.toggle('hidden', p !== pane);
+    document.querySelector<HTMLButtonElement>(`.yt-tab[data-pane="${p}"]`)
+      ?.classList.toggle('yt-tab--active', p === pane);
+  });
+}
+
+function markActiveCard(id: string) {
+  document.querySelectorAll<HTMLElement>('.yt-card').forEach(el => {
+    el.classList.toggle('yt-card--active', el.dataset['ytId'] === id);
+  });
+}
+
+function updateNowPlayingView(id: string, title: string, ch: string) {
+  activeYtTitle = title; activeYtCh = ch; activeYtId = id;
+  if (ytNpThumb) ytNpThumb.src = `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+  if (ytNpTrack) ytNpTrack.textContent = title;
+  if (ytNpChannel) ytNpChannel.textContent = ch;
+  if (ytNpYtLink) ytNpYtLink.href = `https://www.youtube.com/watch?v=${id}`;
+}
+
+function playYtVideo(id: string, title: string, ch: string, startSec = 0) {
+  if (!activeYtIframe) return;
+  ytCurrentIdx = ytPlaylist.findIndex(v => v.id === id);
+  const startParam = startSec > 0 ? `&start=${Math.floor(startSec)}` : '';
+  activeYtIframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1${startParam}`;
+  ytPlayStartedAt = Date.now() - startSec * 1000;
+  ytIsPaused = false;
+  updateNowPlayingView(id, title, ch);
+  updatePausePlayUI();
+  markActiveCard(id);
+  switchYtPane('nowplaying');
+  if (ytShuffle) rebuildShuffled();
+  if (activeYtUpdateFn) activeYtUpdateFn(title);
+  void saveYtPlayState({ id, title, ch, startedAt: ytPlayStartedAt, pausedPosition: 0, isPaused: false });
+  void addYtRecent({ id, title, ch, playedAt: Date.now() });
+}
 
 function shuffleArray(arr: number[]): number[] {
   const a = [...arr];
@@ -961,12 +1052,10 @@ function getNextIdx(): number {
     if (!ytShuffledIndices.length) rebuildShuffled();
     const next = (ytShufflePos + 1) % ytShuffledIndices.length;
     if (next === 0 && ytLoopMode === 'none') return -1;
-    ytShufflePos = next;
-    return ytShuffledIndices[ytShufflePos];
+    ytShufflePos = next; return ytShuffledIndices[ytShufflePos];
   }
   const next = ytCurrentIdx + 1;
-  if (next >= ytPlaylist.length) return ytLoopMode === 'all' ? 0 : -1;
-  return next;
+  return next >= ytPlaylist.length ? (ytLoopMode === 'all' ? 0 : -1) : next;
 }
 
 function getPrevIdx(): number {
@@ -980,97 +1069,40 @@ function getPrevIdx(): number {
   return prev < 0 ? (ytLoopMode === 'all' ? ytPlaylist.length - 1 : 0) : prev;
 }
 
-function markActiveCard(id: string) {
-  document.querySelectorAll('.yt-card').forEach(el => el.classList.remove('yt-card--active'));
-  document.querySelectorAll<HTMLElement>('.yt-card').forEach(el => {
-    if (el.dataset['ytId'] === id) el.classList.add('yt-card--active');
-  });
-}
-
 function ytPlayNext() {
-  if (!activeYtIframe || !activeYtTitleEl || !activeYtOpenLink || !activeYtUpdateFn || !activeYtPlayerView || !activeYtGrid) return;
+  if (!activeYtIframe) return;
   const idx = getNextIdx();
-  if (idx === -1) { activeYtIframe.src = ''; activeYtUpdateFn(null); hideNowPlayingBar(); void clearYtPlayState(); return; }
-  ytCurrentIdx = idx;
+  if (idx === -1) {
+    activeYtIframe.src = '';
+    if (activeYtUpdateFn) activeYtUpdateFn(null);
+    void clearYtPlayState(); return;
+  }
   const v = ytPlaylist[idx];
-  activeYtTitleEl.textContent = `${v.title} · ${v.ch}`;
-  activeYtOpenLink.href = `https://www.youtube.com/watch?v=${v.id}`;
-  activeYtIframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&enablejsapi=1`;
-  ytPlayStartedAt = Date.now();
-  activeYtUpdateFn(v.title);
-  updateNowPlayingBar(v.title, v.ch);
-  markActiveCard(v.id);
-  void saveYtPlayState({ id: v.id, title: v.title, ch: v.ch, startedAt: ytPlayStartedAt, pausedPosition: 0, isPaused: false });
+  playYtVideo(v.id, v.title, v.ch);
 }
 
 function ytPlayPrev() {
-  if (!activeYtIframe || !activeYtTitleEl || !activeYtOpenLink || !activeYtUpdateFn) return;
-  const idx = getPrevIdx();
-  ytCurrentIdx = idx;
-  const v = ytPlaylist[idx];
-  activeYtTitleEl.textContent = `${v.title} · ${v.ch}`;
-  activeYtOpenLink.href = `https://www.youtube.com/watch?v=${v.id}`;
-  activeYtIframe.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&enablejsapi=1`;
-  ytPlayStartedAt = Date.now();
-  activeYtUpdateFn(v.title);
-  updateNowPlayingBar(v.title, v.ch);
-  markActiveCard(v.id);
-  void saveYtPlayState({ id: v.id, title: v.title, ch: v.ch, startedAt: ytPlayStartedAt, pausedPosition: 0, isPaused: false });
+  if (!activeYtIframe) return;
+  const v = ytPlaylist[getPrevIdx()];
+  if (v) playYtVideo(v.id, v.title, v.ch);
 }
 
-function updateNowPlayingBar(title: string, ch: string) {
-  activeYtTitle = title;
-  activeYtCh = ch;
-  if (activeYtNowPlayingTitle) activeYtNowPlayingTitle.textContent = `${title} · ${ch}`;
-  if (activeYtNowPlayingBar) activeYtNowPlayingBar.classList.remove('hidden');
-}
-
-function hideNowPlayingBar() {
-  if (activeYtNowPlayingBar) activeYtNowPlayingBar.classList.add('hidden');
-}
-
-function playYtVideo(id: string, title: string, ch: string,
-  iframe: HTMLIFrameElement, titleEl: HTMLElement, openLink: HTMLAnchorElement,
-  playerView: HTMLElement, grid: HTMLElement,
-  updateNowPlaying: (label: string | null) => void,
-  startSec = 0
-) {
-  ytCurrentIdx = ytPlaylist.findIndex(v => v.id === id);
-  activeYtIframe = iframe; activeYtTitleEl = titleEl;
-  activeYtOpenLink = openLink; activeYtUpdateFn = updateNowPlaying;
-  activeYtPlayerView = playerView; activeYtGrid = grid;
-  grid.classList.add('hidden');
-  playerView.classList.remove('hidden');
-  hideNowPlayingBar();
-  titleEl.textContent = `${title} · ${ch}`;
-  openLink.href = `https://www.youtube.com/watch?v=${id}`;
-  const startParam = startSec > 0 ? `&start=${Math.floor(startSec)}` : '';
-  iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1${startParam}`;
-  ytPlayStartedAt = Date.now() - startSec * 1000;
-  updateNowPlaying(title);
-  markActiveCard(id);
-  if (ytShuffle) rebuildShuffled();
-  void saveYtPlayState({ id, title, ch, startedAt: ytPlayStartedAt, pausedPosition: 0, isPaused: false });
-}
-
-// Auto-advance when video ends; track pause/play for cross-tab sync
+// Auto-advance + pause/play state tracking
 window.addEventListener('message', (e) => {
   if (e.origin !== 'https://www.youtube-nocookie.com') return;
   try {
     const data = JSON.parse(e.data as string);
     if (data.event !== 'onStateChange') return;
-
-    if (data.info === 0 && ytPlaylist.length > 0) {
-      // Video ended — use ytPlayNext which respects loop/shuffle
+    if (data.info === 0) {
       ytPlayNext();
     } else if (data.info === 2) {
-      // Paused — record position
-      const pausedPosition = (Date.now() - ytPlayStartedAt) / 1000;
-      void getYtPlayState().then(s => {
-        if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition });
-      });
+      ytIsPaused = true;
+      updatePausePlayUI();
+      const pos = (Date.now() - ytPlayStartedAt) / 1000;
+      void getYtPlayState().then(s => { if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition: pos }); });
     } else if (data.info === 1) {
-      // Resumed playing
+      ytIsPaused = false;
+      updatePausePlayUI();
       void getYtPlayState().then(s => {
         if (s) {
           ytPlayStartedAt = Date.now() - (s.pausedPosition ?? 0) * 1000;
@@ -1078,84 +1110,21 @@ window.addEventListener('message', (e) => {
         }
       });
     }
-  } catch { /* ignore non-JSON messages */ }
+  } catch { /* non-JSON */ }
 });
 
 async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
-  const ytGrid = document.getElementById('yt-grid') as HTMLElement;
-  const playerView = document.getElementById('yt-player-view') as HTMLElement;
-  const iframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
-  const titleEl = document.getElementById('yt-player-title') as HTMLElement;
-  const openLink = document.getElementById('yt-open-link') as HTMLAnchorElement;
-  const nowPlayingBar = document.getElementById('yt-now-playing-bar') as HTMLElement;
-  const nowPlayingTitle = document.getElementById('yt-np-title') as HTMLElement;
-
-  // Wire up now-playing bar refs for use in playYtVideo / updateNowPlayingBar
-  activeYtNowPlayingBar = nowPlayingBar;
-  activeYtNowPlayingTitle = nowPlayingTitle;
-
-  // Clicking the bar reopens the player view
-  nowPlayingBar.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('#yt-np-stop')) return;
-    ytGrid.classList.add('hidden');
-    playerView.classList.remove('hidden');
-    hideNowPlayingBar();
-  });
-
-  // Stop button clears everything
-  document.getElementById('yt-np-stop')?.addEventListener('click', () => {
-    iframe.src = '';
-    updateNowPlaying(null);
-    hideNowPlayingBar();
-    activeYtIframe = null;
-    void clearYtPlayState();
-  });
-
-  // Prev / Next buttons
-  document.getElementById('yt-btn-prev')?.addEventListener('click', ytPlayPrev);
-  document.getElementById('yt-btn-next')?.addEventListener('click', ytPlayNext);
-
-  // Shuffle toggle
-  const shuffleBtn = document.getElementById('yt-btn-shuffle') as HTMLButtonElement;
-  shuffleBtn?.addEventListener('click', () => {
-    ytShuffle = !ytShuffle;
-    shuffleBtn.classList.toggle('active', ytShuffle);
-    shuffleBtn.title = ytShuffle ? 'Shuffle: ON' : 'Shuffle: OFF';
-    if (ytShuffle) rebuildShuffled();
-  });
-
-  // Loop toggle: all → one → none → all
-  const loopBtn = document.getElementById('yt-btn-loop') as HTMLButtonElement;
-  const loopIcons: Record<string, string> = {
-    all: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
-    one: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><text x="11" y="14" font-size="7" fill="currentColor" stroke="none">1</text></svg>`,
-    none: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
-  };
-  const loopTitles = { all: 'Loop: All', one: 'Loop: One', none: 'Loop: Off' };
-  function updateLoopBtn() {
-    loopBtn.innerHTML = loopIcons[ytLoopMode];
-    loopBtn.title = loopTitles[ytLoopMode];
-    loopBtn.classList.toggle('active', ytLoopMode !== 'none');
-  }
-  updateLoopBtn();
-  loopBtn?.addEventListener('click', () => {
-    ytLoopMode = ytLoopMode === 'all' ? 'one' : ytLoopMode === 'one' ? 'none' : 'all';
-    updateLoopBtn();
-  });
-
-  // Keyboard shortcuts (only active when beats panel is open)
-  document.addEventListener('keydown', (e) => {
-    const beatsPanel = document.getElementById('panel-beats');
-    if (!beatsPanel || beatsPanel.classList.contains('hidden')) return;
-    if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
-    if (e.key === 'ArrowRight') { e.preventDefault(); ytPlayNext(); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); ytPlayPrev(); }
-    else if (e.key === ' ' && activeYtIframe) {
-      e.preventDefault();
-      // Toggle pause via postMessage
-      activeYtIframe.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-    }
-  });
+  activeYtIframe = document.getElementById('yt-iframe') as HTMLIFrameElement;
+  activeYtUpdateFn = updateNowPlaying;
+  ytNpThumb      = document.getElementById('yt-np-thumb')     as HTMLImageElement;
+  ytNpTrack      = document.getElementById('yt-np-track')     as HTMLElement;
+  ytNpChannel    = document.getElementById('yt-np-channel')   as HTMLElement;
+  ytNpYtLink     = document.getElementById('yt-np-ytlink')    as HTMLAnchorElement;
+  ytNpPausePlayBtn = document.getElementById('yt-np-playpause') as HTMLButtonElement;
+  ytNpPauseIcon  = document.getElementById('yt-np-pause-icon') as unknown as SVGElement;
+  ytNpPlayIcon   = document.getElementById('yt-np-play-icon')  as unknown as SVGElement;
+  const canvas   = document.getElementById('yt-visualizer')   as HTMLCanvasElement;
+  const ytGrid   = document.getElementById('yt-grid')         as HTMLElement;
 
   let customVideos = await getCustomYtVideos();
 
@@ -1168,17 +1137,14 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
 
   function renderGrid() {
     ytGrid.innerHTML = '';
-
-    // Custom section
     if (customVideos.length > 0) {
       const hdr = document.createElement('div');
       hdr.className = 'yt-section-hdr';
       hdr.innerHTML = `<span>MY PLAYLIST <span class="yt-count">${customVideos.length}</span></span>`;
       ytGrid.appendChild(hdr);
-
       customVideos.slice().reverse().forEach(v => {
         const card = buildYtCard(v.id, v.title, 'My Playlist', true,
-          (id, t, ch) => playYtVideo(id, t, ch, iframe, titleEl, openLink, playerView, ytGrid, updateNowPlaying),
+          (id, t, ch) => playYtVideo(id, t, ch),
           async (id) => {
             customVideos = customVideos.filter(c => c.id !== id);
             await saveCustomYtVideos(customVideos);
@@ -1187,30 +1153,40 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
         );
         ytGrid.appendChild(card);
       });
-
-      const divider = document.createElement('div');
-      divider.className = 'yt-section-hdr';
-      divider.innerHTML = '<span>BUILT-IN</span>';
-      ytGrid.appendChild(divider);
+      const div = document.createElement('div');
+      div.className = 'yt-section-hdr';
+      div.innerHTML = '<span>BUILT-IN</span>';
+      ytGrid.appendChild(div);
     }
-
-    // Built-in videos
     YT_VIDEOS.forEach(v => {
-      const card = buildYtCard(v.id, v.title, v.ch, false,
-        (id, t, ch) => playYtVideo(id, t, ch, iframe, titleEl, openLink, playerView, ytGrid, updateNowPlaying)
-      );
-      ytGrid.appendChild(card);
+      ytGrid.appendChild(buildYtCard(v.id, v.title, v.ch, false, (id, t, ch) => playYtVideo(id, t, ch)));
     });
-
     rebuildPlaylist();
-    // Re-apply active card highlight if something is playing
-    if (activeYtTitle) markActiveCard(ytPlaylist[ytCurrentIdx]?.id ?? '');
+    if (activeYtId) markActiveCard(activeYtId);
   }
 
-  renderGrid();
+  async function renderRecent() {
+    const recentGrid = document.getElementById('yt-recent-grid') as HTMLElement;
+    const emptyMsg   = document.getElementById('yt-recent-empty') as HTMLElement;
+    const recent = await getYtRecent();
+    recentGrid.innerHTML = '';
+    emptyMsg.classList.toggle('hidden', recent.length > 0);
+    recent.forEach(v => {
+      recentGrid.appendChild(buildYtCard(v.id, v.title, v.ch, false, (id, t, ch) => playYtVideo(id, t, ch)));
+    });
+  }
+
+  // Tab bar
+  document.querySelectorAll<HTMLButtonElement>('.yt-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pane = btn.dataset['pane']!;
+      switchYtPane(pane);
+      if (pane === 'recent') void renderRecent();
+    });
+  });
 
   // Add custom video form
-  const form = document.getElementById('yt-add-form') as HTMLFormElement;
+  const form  = document.getElementById('yt-add-form')  as HTMLFormElement;
   const input = document.getElementById('yt-add-input') as HTMLInputElement;
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1223,49 +1199,95 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     customVideos.push({ id, title, addedAt: Date.now() });
     await saveCustomYtVideos(customVideos);
     btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add`;
-    btn.disabled = false;
-    input.value = '';
+    btn.disabled = false; input.value = '';
     rebuildPlaylist(); renderGrid();
   });
 
-  document.getElementById('btn-yt-back')?.addEventListener('click', () => {
-    playerView.classList.add('hidden');
-    ytGrid.classList.remove('hidden');
-    // Keep iframe src alive — music continues playing
-    if (activeYtTitle) updateNowPlayingBar(activeYtTitle, activeYtCh);
+  // Now Playing controls
+  ytNpPausePlayBtn?.addEventListener('click', () => {
+    if (!activeYtIframe) return;
+    const cmd = ytIsPaused ? 'playVideo' : 'pauseVideo';
+    activeYtIframe.contentWindow?.postMessage(`{"event":"command","func":"${cmd}","args":""}`, '*');
+  });
+  document.getElementById('yt-np-prev')?.addEventListener('click', ytPlayPrev);
+  document.getElementById('yt-np-next')?.addEventListener('click', ytPlayNext);
+
+  const shuffleBtn = document.getElementById('yt-np-shuffle') as HTMLButtonElement;
+  shuffleBtn?.addEventListener('click', () => {
+    ytShuffle = !ytShuffle;
+    shuffleBtn.classList.toggle('active', ytShuffle);
+    shuffleBtn.title = ytShuffle ? 'Shuffle: ON' : 'Shuffle: OFF';
+    if (ytShuffle) rebuildShuffled();
   });
 
-  // Cross-tab sync: on tab open, check if another tab was playing
+  const loopBtn = document.getElementById('yt-np-loop') as HTMLButtonElement;
+  const loopLabels = { all: 'Loop: All', one: 'Loop: One', none: 'Loop: Off' };
+  function updateLoopBtn() {
+    loopBtn.title = loopLabels[ytLoopMode];
+    loopBtn.style.opacity = ytLoopMode === 'none' ? '0.4' : '1';
+    loopBtn.classList.toggle('active', ytLoopMode !== 'none');
+    // Show "1" badge for loop-one
+    const badge = loopBtn.querySelector<HTMLElement>('.yt-loop-badge');
+    if (ytLoopMode === 'one') {
+      if (!badge) {
+        const b = document.createElement('span'); b.className = 'yt-loop-badge'; b.textContent = '1';
+        loopBtn.appendChild(b);
+      }
+    } else {
+      badge?.remove();
+    }
+  }
+  updateLoopBtn();
+  loopBtn?.addEventListener('click', () => {
+    ytLoopMode = ytLoopMode === 'all' ? 'one' : ytLoopMode === 'one' ? 'none' : 'all';
+    updateLoopBtn();
+  });
+
+  // Keyboard shortcuts (only when Beats panel is active)
+  document.addEventListener('keydown', (e) => {
+    const beatsPanel = document.getElementById('panel-beats');
+    if (!beatsPanel || beatsPanel.classList.contains('hidden')) return;
+    if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); ytPlayNext(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); ytPlayPrev(); }
+    else if (e.key === ' ' && activeYtIframe?.src) {
+      e.preventDefault();
+      ytNpPausePlayBtn?.click();
+    }
+  });
+
+  // Start visualizer (runs continuously, reacts to ytIsPaused state)
+  startVisualizer(canvas);
+
+  renderGrid();
+
+  // Cross-tab / new-tab auto-resume
   const savedState = await getYtPlayState();
-  if (savedState && !activeYtIframe) {
+  if (savedState && Date.now() - savedState.startedAt < 8 * 3600 * 1000) {
+    rebuildPlaylist();
     const elapsed = savedState.isPaused
       ? savedState.pausedPosition
       : (Date.now() - savedState.startedAt) / 1000;
-    // Only offer resume if the track has been playing/paused recently (within 8 hours)
-    const ageMs = Date.now() - savedState.startedAt;
-    if (ageMs < 8 * 60 * 60 * 1000) {
-      nowPlayingBar.classList.remove('hidden');
-      nowPlayingTitle.textContent = `Resume: ${savedState.title} · ${savedState.ch}`;
-      nowPlayingBar.addEventListener('click', function onResumeClick(e) {
-        if ((e.target as HTMLElement).closest('#yt-np-stop')) return;
-        nowPlayingBar.removeEventListener('click', onResumeClick);
-        rebuildPlaylist();
-        playYtVideo(savedState.id, savedState.title, savedState.ch,
-          iframe, titleEl, openLink, playerView, ytGrid, updateNowPlaying,
-          Math.max(0, Math.floor(elapsed))
-        );
-      }, { once: false });
-      // Re-wire stop for resume bar too
+    if (savedState.isPaused) {
+      // Show Now Playing in paused state without auto-playing
+      updateNowPlayingView(savedState.id, savedState.title, savedState.ch);
+      ytIsPaused = true;
+      updatePausePlayUI();
+      switchYtPane('nowplaying');
+    } else {
+      // Auto-resume from same position
+      playYtVideo(savedState.id, savedState.title, savedState.ch, Math.max(0, Math.floor(elapsed)));
     }
   }
 
-  // Cross-tab live sync: when another tab updates play state, show resume bar
+  // Live cross-tab sync: when another tab plays something new
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes['mt_yt_play_state']) return;
     const newState = changes['mt_yt_play_state'].newValue as YtPlayState | undefined;
-    if (!newState || activeYtIframe) return; // already playing in this tab
-    nowPlayingTitle.textContent = `${newState.isPaused ? 'Paused' : '♪'} ${newState.title} · ${newState.ch}`;
-    nowPlayingBar.classList.remove('hidden');
+    if (!newState || activeYtId) return; // this tab already has a track loaded
+    updateNowPlayingView(newState.id, newState.title, newState.ch);
+    ytIsPaused = newState.isPaused;
+    updatePausePlayUI();
   });
 }
 
@@ -1695,8 +1717,8 @@ function initFocusMode() {
       fmSoundInfo = { label: title, variantId: `yt-${id}` };
       updateFmSoundChip();
       // Sync with shared playlist state
-      activeYtIframe = fmYtIframe; activeYtTitleEl = fmYtTitle;
-      activeYtOpenLink = fmYtOpen; activeYtUpdateFn = (label) => {
+      activeYtIframe = fmYtIframe;
+      activeYtUpdateFn = (label) => {
         if (label) { fmSoundInfo = { label, variantId: `yt-active` }; updateFmSoundChip(); }
       };
       ytCurrentIdx = ytPlaylist.findIndex(v => v.id === id);

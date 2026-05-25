@@ -408,6 +408,137 @@ function synthCafeRainy(ac: AudioContext, dest: AudioNode) {
   synthRainWindow(ac, dest);
 }
 
+// ── Train ────────────────────────────────────────────────────────────────────
+
+function synthTrain(ac: AudioContext, dest: AudioNode) {
+  const rumble = noiseSource(ac);
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 130;
+  const g = ac.createGain(); g.gain.value = 0.35;
+  rumble.connect(lp); lp.connect(g); g.connect(dest);
+  rumble.start();
+  activeNodes.push(rumble, lp, g);
+  const mySession = session;
+  function clack(offset: number) {
+    if (session !== mySession) return;
+    const imp = noiseSource(ac);
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 800;
+    const ig = ac.createGain(); ig.gain.value = 0;
+    imp.connect(hp); hp.connect(ig); ig.connect(dest);
+    const now = ac.currentTime;
+    ig.gain.setValueAtTime(0.38, now);
+    ig.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    imp.start(now); imp.stop(now + 0.09);
+    setTimeout(() => clack(offset), 310 + Math.random() * 30);
+  }
+  clack(0);
+  setTimeout(() => clack(1), 155);
+}
+
+// ── Noise family ─────────────────────────────────────────────────────────────
+
+function synthWhiteNoise(ac: AudioContext, dest: AudioNode) {
+  const src = noiseSource(ac);
+  const g = ac.createGain(); g.gain.value = 0.6;
+  src.connect(g); g.connect(dest);
+  src.start();
+  activeNodes.push(src, g);
+}
+
+function synthBrownNoise(ac: AudioContext, dest: AudioNode) {
+  const src = noiseSource(ac);
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 150; lp.Q.value = 0.5;
+  const g = ac.createGain(); g.gain.value = 1.1;
+  src.connect(lp); lp.connect(g); g.connect(dest);
+  src.start();
+  activeNodes.push(src, lp, g);
+}
+
+function synthPinkNoise(ac: AudioContext, dest: AudioNode) {
+  const src = noiseSource(ac);
+  [80, 250, 800, 2500, 8000].forEach(freq => {
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 0.8;
+    const g = ac.createGain(); g.gain.value = 0.28 / Math.log10(freq / 50);
+    src.connect(bp); bp.connect(g); g.connect(dest);
+    activeNodes.push(bp, g);
+  });
+  src.start();
+  activeNodes.push(src);
+}
+
+// ── Binaural beats ────────────────────────────────────────────────────────────
+
+function synthBinaural(ac: AudioContext, dest: AudioNode, baseFreq: number, beatFreq: number) {
+  const leftOsc = ac.createOscillator(); leftOsc.type = 'sine'; leftOsc.frequency.value = baseFreq;
+  const rightOsc = ac.createOscillator(); rightOsc.type = 'sine'; rightOsc.frequency.value = baseFreq + beatFreq;
+  const leftPan = ac.createStereoPanner(); leftPan.pan.value = -1;
+  const rightPan = ac.createStereoPanner(); rightPan.pan.value = 1;
+  const lg = ac.createGain(); lg.gain.value = 0.12;
+  const rg = ac.createGain(); rg.gain.value = 0.12;
+  leftOsc.connect(lg); lg.connect(leftPan); leftPan.connect(dest);
+  rightOsc.connect(rg); rg.connect(rightPan); rightPan.connect(dest);
+  leftOsc.start(); rightOsc.start();
+  // Gentle carrier noise bed so it's audible without headphones too
+  const bed = noiseSource(ac);
+  const bedLp = ac.createBiquadFilter(); bedLp.type = 'lowpass'; bedLp.frequency.value = 300;
+  const bedG = ac.createGain(); bedG.gain.value = 0.08;
+  bed.connect(bedLp); bedLp.connect(bedG); bedG.connect(dest);
+  bed.start();
+  activeNodes.push(leftOsc, rightOsc, leftPan, rightPan, lg, rg, bed, bedLp, bedG);
+}
+
+// ── Garden ────────────────────────────────────────────────────────────────────
+
+function synthGarden(ac: AudioContext, dest: AudioNode) {
+  synthBirds(ac, dest);
+  const breeze = noiseSource(ac);
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+  const g = ac.createGain(); g.gain.value = 0.18;
+  breeze.connect(lp); lp.connect(g); g.connect(dest);
+  breeze.start();
+  activeNodes.push(breeze, lp, g);
+}
+
+// ── Office family ─────────────────────────────────────────────────────────────
+
+function synthOfficeAC(ac: AudioContext, dest: AudioNode) {
+  const hum = noiseSource(ac);
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 180;
+  const hg = ac.createGain(); hg.gain.value = 0.18;
+  hum.connect(lp); lp.connect(hg); hg.connect(dest);
+  hum.start();
+  activeNodes.push(hum, lp, hg);
+  const murmur = noiseSource(ac);
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 0.35;
+  const mg = ac.createGain(); mg.gain.value = 0.14;
+  murmur.connect(bp); bp.connect(mg); mg.connect(dest);
+  murmur.start();
+  activeNodes.push(murmur, bp, mg);
+}
+
+function synthOfficeTyping(ac: AudioContext, dest: AudioNode) {
+  synthOfficeAC(ac, dest);
+  const mySession = session;
+  function typeBurst() {
+    if (session !== mySession) return;
+    const keys = 2 + Math.floor(Math.random() * 7);
+    for (let i = 0; i < keys; i++) {
+      setTimeout(() => {
+        if (session !== mySession) return;
+        const imp = noiseSource(ac);
+        const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1500;
+        const ig = ac.createGain(); ig.gain.value = 0;
+        imp.connect(hp); hp.connect(ig); ig.connect(dest);
+        const now = ac.currentTime;
+        ig.gain.setValueAtTime(0.1 + Math.random() * 0.07, now);
+        ig.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        imp.start(now); imp.stop(now + 0.05);
+      }, i * (50 + Math.random() * 75));
+    }
+    setTimeout(typeBurst, 350 + Math.random() * 2200);
+  }
+  typeBurst();
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export interface SoundVariant {
@@ -492,6 +623,42 @@ export const SOUNDSCAPES: Soundscape[] = [
       { id: 'cafe-rainy', label: 'Rainy Day Café' },
     ],
   },
+  {
+    id: 'train', label: 'Train',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="12" rx="2"/><path d="M4 10h16"/><circle cx="8.5" cy="18.5" r="1.5"/><circle cx="15.5" cy="18.5" r="1.5"/><path d="M9 15l-1 3.5M15 15l1 3.5"/></svg>`,
+    variants: [{ id: 'train', label: 'Train Ride' }],
+  },
+  {
+    id: 'noise', label: 'Noise',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 12h2M20 12h2M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/><circle cx="12" cy="12" r="4"/></svg>`,
+    variants: [
+      { id: 'noise-white', label: 'White Noise' },
+      { id: 'noise-brown', label: 'Brown Noise' },
+      { id: 'noise-pink',  label: 'Pink Noise'  },
+    ],
+  },
+  {
+    id: 'binaural', label: 'Binaural',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 8a9 9 0 0 1 18 0v4a9 9 0 0 1-4 7.5"/><path d="M5 12a7 7 0 0 0 7 7"/><circle cx="6" cy="14" r="2"/><circle cx="18" cy="14" r="2"/></svg>`,
+    variants: [
+      { id: 'binaural-alpha', label: 'Alpha  10 Hz' },
+      { id: 'binaural-theta', label: 'Theta   6 Hz' },
+      { id: 'binaural-gamma', label: 'Gamma 40 Hz' },
+    ],
+  },
+  {
+    id: 'garden', label: 'Garden',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12"/><path d="M12 12C12 7 7 4 3 6c0 4 3 7 9 6"/><path d="M12 12c0-5 5-8 9-6-1 4-4 7-9 6"/></svg>`,
+    variants: [{ id: 'garden', label: 'Garden' }],
+  },
+  {
+    id: 'office', label: 'Office',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
+    variants: [
+      { id: 'office-quiet',  label: 'Quiet Office' },
+      { id: 'office-typing', label: 'Keyboard & AC' },
+    ],
+  },
 ];
 
 const SYNTH_MAP: Record<string, (ac: AudioContext, dest: AudioNode) => void> = {
@@ -516,6 +683,16 @@ const SYNTH_MAP: Record<string, (ac: AudioContext, dest: AudioNode) => void> = {
   'cafe-quiet':      synthCafeQuiet,
   'cafe-busy':       synthCafeBusy,
   'cafe-rainy':      synthCafeRainy,
+  'train':           synthTrain,
+  'noise-white':     synthWhiteNoise,
+  'noise-brown':     synthBrownNoise,
+  'noise-pink':      synthPinkNoise,
+  'binaural-alpha':  (ac, d) => synthBinaural(ac, d, 200, 10),
+  'binaural-theta':  (ac, d) => synthBinaural(ac, d, 200, 6),
+  'binaural-gamma':  (ac, d) => synthBinaural(ac, d, 200, 40),
+  'garden':          synthGarden,
+  'office-quiet':    synthOfficeAC,
+  'office-typing':   synthOfficeTyping,
 };
 
 export function playSoundscape(variantId: string, volume: number) {

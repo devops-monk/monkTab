@@ -116,6 +116,25 @@ export async function clearYtPlayState(): Promise<void> {
   await chrome.storage.local.remove('mt_yt_play_state');
 }
 
+export interface YtRecentTrack {
+  id: string;
+  title: string;
+  ch: string;
+  playedAt: number;
+}
+
+export async function getYtRecent(): Promise<YtRecentTrack[]> {
+  const result = await chrome.storage.local.get('mt_yt_recent');
+  return (result['mt_yt_recent'] as YtRecentTrack[]) ?? [];
+}
+
+export async function addYtRecent(track: YtRecentTrack): Promise<void> {
+  let recent = await getYtRecent();
+  recent = recent.filter(r => r.id !== track.id);
+  recent.unshift(track);
+  await chrome.storage.local.set({ mt_yt_recent: recent.slice(0, 15) });
+}
+
 const DEFAULTS: Settings = {
   name: '',
   searchEngine: 'google',
