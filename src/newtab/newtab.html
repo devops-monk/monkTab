@@ -410,7 +410,7 @@
       <div class="yt-tab-bar">
         <button class="yt-tab yt-tab--active" data-pane="library">Library</button>
         <button class="yt-tab" data-pane="recent">Recent</button>
-        <button class="yt-tab yt-tab--cta" data-pane="nowplaying">Now Playing →</button>
+        <button class="yt-tab yt-tab--cta hidden" id="yt-tab-nowplaying" data-pane="nowplaying">Now Playing →</button>
       </div>
 
       <!-- Library pane -->
@@ -437,37 +437,63 @@
 
       <!-- Now Playing pane -->
       <div id="yt-pane-nowplaying" class="yt-pane yt-np-pane hidden">
-        <div class="yt-np-artwork">
-          <img id="yt-np-thumb" class="yt-np-thumb" src="" alt=""/>
-          <div class="yt-np-thumb-glow"></div>
+
+        <!-- Empty state (shown when nothing has been played) -->
+        <div id="yt-np-empty" class="yt-np-empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <p class="yt-np-empty-title">Nothing playing yet</p>
+          <p class="yt-np-empty-sub">Pick a track from the Library to start listening</p>
+          <button class="yt-np-empty-btn" data-pane="library">Browse Library</button>
         </div>
-        <div class="yt-np-meta">
-          <span id="yt-np-track" class="yt-np-track">Nothing playing</span>
-          <span id="yt-np-channel" class="yt-np-channel">—</span>
+
+        <!-- Player content (hidden until first play) -->
+        <div id="yt-np-player" class="yt-np-player hidden">
+          <div class="yt-np-artwork">
+            <img id="yt-np-thumb" class="yt-np-thumb" src="" alt=""/>
+            <div class="yt-np-thumb-glow"></div>
+          </div>
+          <div class="yt-np-meta">
+            <span id="yt-np-track" class="yt-np-track"></span>
+            <span id="yt-np-channel" class="yt-np-channel"></span>
+          </div>
+          <canvas id="yt-visualizer" class="yt-visualizer" width="280" height="44"></canvas>
+
+          <!-- Seek row -->
+          <div class="yt-np-seek-row">
+            <button id="yt-seek-back" class="yt-seek-btn" title="Back 15 seconds">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
+              <span>15</span>
+            </button>
+            <span id="yt-elapsed" class="yt-elapsed">0:00</span>
+            <button id="yt-seek-fwd" class="yt-seek-btn" title="Forward 15 seconds">
+              <span>15</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-5"/></svg>
+            </button>
+          </div>
+
+          <div class="yt-np-controls">
+            <button id="yt-np-shuffle" class="yt-np-ctrl yt-np-ctrl--sm" title="Shuffle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+            </button>
+            <button id="yt-np-prev" class="yt-np-ctrl" title="Previous (←)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+            </button>
+            <button id="yt-np-playpause" class="yt-np-ctrl yt-np-ctrl--lg" title="Pause">
+              <svg id="yt-np-pause-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+              <svg id="yt-np-play-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="hidden"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <button id="yt-np-next" class="yt-np-ctrl" title="Next (→)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+            </button>
+            <button id="yt-np-loop" class="yt-np-ctrl yt-np-ctrl--sm" title="Loop: All">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+          </div>
+          <a id="yt-np-ytlink" class="yt-np-ytlink" target="_blank" rel="noopener" href="#">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Watch on YouTube
+          </a>
         </div>
-        <canvas id="yt-visualizer" class="yt-visualizer" width="280" height="44"></canvas>
-        <div class="yt-np-controls">
-          <button id="yt-np-shuffle" class="yt-np-ctrl yt-np-ctrl--sm" title="Shuffle">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-          </button>
-          <button id="yt-np-prev" class="yt-np-ctrl" title="Previous (←)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
-          </button>
-          <button id="yt-np-playpause" class="yt-np-ctrl yt-np-ctrl--lg" title="Pause">
-            <svg id="yt-np-pause-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-            <svg id="yt-np-play-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="hidden"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </button>
-          <button id="yt-np-next" class="yt-np-ctrl" title="Next (→)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-          </button>
-          <button id="yt-np-loop" class="yt-np-ctrl yt-np-ctrl--sm" title="Loop: All">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          </button>
-        </div>
-        <a id="yt-np-ytlink" class="yt-np-ytlink" target="_blank" rel="noopener" href="#">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Watch on YouTube
-        </a>
       </div>
     </div>
   </div>

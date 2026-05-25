@@ -1019,6 +1019,45 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
 /* Now Playing pane */
 .yt-np-pane { align-items: center; gap: 12px; padding: 4px 0 8px; }
+
+/* Empty state */
+.yt-np-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 28px 20px; text-align: center; width: 100%;
+}
+.yt-np-empty-title {
+  font-size: 14px; font-weight: 600; color: var(--text); margin: 0;
+}
+.yt-np-empty-sub {
+  font-size: 12px; color: var(--text-dimmer); margin: 0;
+}
+.yt-np-empty-btn {
+  margin-top: 6px; padding: 7px 18px; border-radius: 20px; border: none; cursor: pointer;
+  background: rgba(167,139,250,0.2); border: 1px solid rgba(167,139,250,0.4);
+  color: #c4b5fd; font-size: 12px; font-weight: 600;
+  transition: all var(--transition);
+}
+.yt-np-empty-btn:hover { background: rgba(167,139,250,0.35); color: #fff; }
+
+/* Player wrapper */
+.yt-np-player { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+
+/* Seek row */
+.yt-np-seek-row {
+  display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%;
+}
+.yt-seek-btn {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--glass); border: 1px solid var(--glass-border); border-radius: 20px;
+  color: var(--text-dim); font-size: 11px; font-weight: 700; padding: 5px 11px;
+  cursor: pointer; transition: all var(--transition);
+}
+.yt-seek-btn:hover { background: rgba(255,255,255,0.14); color: var(--text); border-color: rgba(255,255,255,0.25); }
+.yt-elapsed {
+  font-size: 13px; font-weight: 600; color: var(--text-dim);
+  font-variant-numeric: tabular-nums; min-width: 38px; text-align: center;
+  letter-spacing: 0.03em;
+}
 .yt-np-artwork {
   position: relative; width: 100%; max-width: 220px;
   border-radius: 14px; overflow: hidden; flex-shrink: 0;

@@ -1988,6 +1988,10 @@ function updateNowPlayingView(id: string, title: string, ch: string) {
   if (ytNpTrack) ytNpTrack.textContent = title;
   if (ytNpChannel) ytNpChannel.textContent = ch;
   if (ytNpYtLink) ytNpYtLink.href = `https://www.youtube.com/watch?v=${id}`;
+  // Reveal player, hide empty state, show the tab button
+  document.getElementById('yt-np-empty')?.classList.add('hidden');
+  document.getElementById('yt-np-player')?.classList.remove('hidden');
+  document.getElementById('yt-tab-nowplaying')?.classList.remove('hidden');
 }
 
 function playYtVideo(id: string, title: string, ch: string, startSec = 0) {
@@ -2000,6 +2004,8 @@ function playYtVideo(id: string, title: string, ch: string, startSec = 0) {
   updateNowPlayingView(id, title, ch);
   updatePausePlayUI();
   markActiveCard(id);
+  const elapsedReset = document.getElementById('yt-elapsed');
+  if (elapsedReset) elapsedReset.textContent = startSec > 0 ? `${Math.floor(startSec / 60)}:${String(Math.floor(startSec % 60)).padStart(2, '0')}` : '0:00';
   switchYtPane('nowplaying');
   if (ytShuffle) rebuildShuffled();
   if (activeYtUpdateFn) activeYtUpdateFn(title);
@@ -2099,8 +2105,43 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   ytNpPausePlayBtn = document.getElementById('yt-np-playpause') as HTMLButtonElement;
   ytNpPauseIcon  = document.getElementById('yt-np-pause-icon') as unknown as SVGElement;
   ytNpPlayIcon   = document.getElementById('yt-np-play-icon')  as unknown as SVGElement;
-  const canvas   = document.getElementById('yt-visualizer')   as HTMLCanvasElement;
-  const ytGrid   = document.getElementById('yt-grid')         as HTMLElement;
+  const canvas      = document.getElementById('yt-visualizer')   as HTMLCanvasElement;
+  const ytGrid      = document.getElementById('yt-grid')         as HTMLElement;
+  const elapsedEl   = document.getElementById('yt-elapsed')      as HTMLElement;
+
+  // Elapsed time ticker
+  function fmtTime(sec: number): string {
+    const s = Math.floor(Math.max(0, sec));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+  setInterval(() => {
+    if (!activeYtId || ytIsPaused || !elapsedEl) return;
+    elapsedEl.textContent = fmtTime((Date.now() - ytPlayStartedAt) / 1000);
+  }, 1000);
+
+  // Seek helpers using YouTube iframe postMessage API
+  function ytSeekBy(deltaSec: number) {
+    if (!activeYtIframe || !activeYtId) return;
+    const current = ytIsPaused
+      ? 0  // approximate; we don't track pausedPosition here cleanly
+      : Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
+    const newPos = Math.max(0, current + deltaSec);
+    activeYtIframe.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'seekTo', args: [newPos, true] }),
+      'https://www.youtube-nocookie.com'
+    );
+    if (!ytIsPaused) {
+      ytPlayStartedAt = Date.now() - newPos * 1000;
+      if (elapsedEl) elapsedEl.textContent = fmtTime(newPos);
+    }
+  }
+  document.getElementById('yt-seek-back')?.addEventListener('click', () => ytSeekBy(-15));
+  document.getElementById('yt-seek-fwd')?.addEventListener('click',  () => ytSeekBy(+15));
+
+  // "Browse Library" button in empty state
+  document.querySelector<HTMLButtonElement>('.yt-np-empty-btn')?.addEventListener('click', () => {
+    switchYtPane('library');
+  });
 
   let customVideos = await getCustomYtVideos();
 
