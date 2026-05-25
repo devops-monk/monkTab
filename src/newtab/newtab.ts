@@ -314,9 +314,17 @@ function renderTodos() {
   const list = document.getElementById('todo-list') as HTMLUListElement;
   list.innerHTML = '';
 
-  const activeCount = todos.filter(t => !t.done).length;
+  const doneCount = todos.filter(t => t.done).length;
+  const activeCount = todos.length - doneCount;
   const countEl = document.getElementById('todo-count');
   if (countEl) countEl.textContent = activeCount > 0 ? String(activeCount) : '';
+
+  // Progress bar
+  const progressBar = document.getElementById('todo-progress-bar') as HTMLElement;
+  if (progressBar) {
+    const pct = todos.length ? Math.round((doneCount / todos.length) * 100) : 0;
+    progressBar.style.width = pct + '%';
+  }
 
   const clearBtn = document.getElementById('btn-clear-done') as HTMLElement;
   clearBtn?.classList.toggle('hidden', !todos.some(t => t.done));
@@ -396,28 +404,40 @@ async function initTodos() {
     saveTodos(todos); renderTodos(); renderFmTodos(); updatePomoTask();
   });
 
-  // Priority toggle button
-  const priBtn = document.getElementById('todo-priority-btn') as HTMLButtonElement;
-  const PRIS: Array<'none' | 'medium' | 'high'> = ['none', 'medium', 'high'];
-  let priIdx = 0;
-  priBtn?.addEventListener('click', () => {
-    priIdx = (priIdx + 1) % PRIS.length;
-    priBtn.dataset['pri'] = PRIS[priIdx];
+  // Priority chips
+  const addCard = document.getElementById('todo-add-card')!;
+  let selectedPri: 'none' | 'medium' | 'high' = 'none';
+  document.querySelectorAll<HTMLButtonElement>('.todo-pri-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      selectedPri = chip.dataset['pri'] as typeof selectedPri;
+      document.querySelectorAll('.todo-pri-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
   });
 
-  // Date picker toggle
+  // Date picker — input stays in DOM always so picker anchors correctly
   const dateBtn = document.getElementById('todo-date-btn') as HTMLButtonElement;
+  const dateLabel = document.getElementById('todo-date-label')!;
   const dueDateInput = document.getElementById('todo-due-date') as HTMLInputElement;
   dateBtn?.addEventListener('click', () => {
-    if (dueDateInput.classList.toggle('visible')) {
-      dueDateInput.showPicker?.();
-      dueDateInput.focus();
-    } else {
-      dueDateInput.value = '';
-    }
+    dueDateInput.showPicker?.();
   });
   dueDateInput?.addEventListener('change', () => {
-    dateBtn?.classList.toggle('has-date', !!dueDateInput.value);
+    const hasDate = !!dueDateInput.value;
+    dateBtn?.classList.toggle('has-date', hasDate);
+    if (hasDate) {
+      const d = new Date(dueDateInput.value + 'T00:00:00');
+      dateLabel.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } else {
+      dateLabel.textContent = 'Set date';
+    }
+  });
+
+  // Expand meta row when input is focused
+  const todoInput = document.getElementById('todo-input') as HTMLInputElement;
+  todoInput?.addEventListener('focus', () => addCard.classList.add('expanded'));
+  todoInput?.addEventListener('blur', () => {
+    if (!todoInput.value) addCard.classList.remove('expanded');
   });
 
   // Add task form
@@ -427,12 +447,16 @@ async function initTodos() {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    const priority = (priBtn?.dataset['pri'] ?? 'none') as Todo['priority'];
     const dueDate = dueDateInput?.value || undefined;
-    todos.push({ id: Date.now().toString(), text, done: false, priority, dueDate });
-    priIdx = 0; if (priBtn) priBtn.dataset['pri'] = 'none';
-    if (dueDateInput) { dueDateInput.value = ''; dueDateInput.classList.remove('visible'); }
-    dateBtn?.classList.remove('has-date');
+    todos.push({ id: Date.now().toString(), text, done: false, priority: selectedPri, dueDate });
+    // Reset
+    selectedPri = 'none';
+    document.querySelectorAll('.todo-pri-chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('.todo-pri-chip.chip-none')?.classList.add('active');
+    if (dueDateInput) dueDateInput.value = '';
+    if (dateBtn) dateBtn.classList.remove('has-date');
+    dateLabel.textContent = 'Set date';
+    addCard.classList.remove('expanded');
     saveTodos(todos); renderTodos(); renderFmTodos(); input.value = ''; updatePomoTask();
   });
 }
