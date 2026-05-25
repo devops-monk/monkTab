@@ -28,6 +28,7 @@ export interface Todo {
   text: string;
   done: boolean;
   priority?: 'high' | 'medium' | 'none';
+  dueDate?: string; // ISO date string YYYY-MM-DD
 }
 
 export interface QuickLink {

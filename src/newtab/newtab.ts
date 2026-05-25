@@ -171,16 +171,94 @@ function filteredTodos() {
   return todos;
 }
 
+function dueDateLabel(dateStr: string): string {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dateStr + 'T00:00:00'); d.setHours(0,0,0,0);
+  const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return 'Past';
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function buildTodoItem(todo: Todo): HTMLLIElement {
+  const li = document.createElement('li');
+  const pri = todo.priority ?? 'none';
+  li.className = `todo-item${todo.done ? ' done' : ''}${pri !== 'none' ? ` pri-${pri}` : ''}`;
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.className = 'todo-cb'; cb.checked = todo.done;
+  cb.addEventListener('change', () => {
+    todo.done = cb.checked;
+    saveTodos(todos);
+    renderTodos(); renderFmTodos(); updatePomoTask();
+  });
+
+  const textWrap = document.createElement('div');
+  textWrap.className = 'todo-text-wrap';
+  const span = document.createElement('span');
+  span.textContent = todo.text;
+
+  const meta = document.createElement('div');
+  meta.className = 'todo-meta';
+
+  if (pri !== 'none') {
+    const priBadge = document.createElement('span');
+    priBadge.className = 'todo-pri-badge';
+    priBadge.textContent = pri === 'high' ? 'High' : 'Medium';
+    meta.appendChild(priBadge);
+  }
+
+  if (todo.dueDate) {
+    const today = todayString();
+    const isOverdue = !todo.done && todo.dueDate < today;
+    const isToday = todo.dueDate === today;
+    const chip = document.createElement('span');
+    chip.className = `todo-due-chip${isOverdue ? ' overdue' : isToday ? ' today' : ''}`;
+    const d = new Date(todo.dueDate + 'T00:00:00');
+    chip.textContent = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    meta.appendChild(chip);
+  }
+
+  textWrap.append(span, meta);
+
+  const actions = document.createElement('div');
+  actions.className = 'todo-item-actions';
+
+  if (!todo.done) {
+    const focusBtn = document.createElement('button');
+    focusBtn.className = 'focus-task-btn';
+    focusBtn.title = 'Start focus session on this task';
+    focusBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
+    focusBtn.addEventListener('click', () => {
+      document.getElementById('pomodoro-panel')?.classList.add('hidden');
+      enterFocusMode();
+      if (fmTaskLabelEl) fmTaskLabelEl.textContent = todo.text;
+    });
+    actions.appendChild(focusBtn);
+  }
+
+  const del = document.createElement('button');
+  del.className = 'del-btn'; del.title = 'Delete';
+  del.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+  del.addEventListener('click', () => {
+    todos = todos.filter(t => t.id !== todo.id);
+    saveTodos(todos); renderTodos(); renderFmTodos(); updatePomoTask();
+  });
+  actions.appendChild(del);
+
+  li.append(cb, textWrap, actions);
+  return li;
+}
+
 function renderTodos() {
   const list = document.getElementById('todo-list') as HTMLUListElement;
   list.innerHTML = '';
 
-  // Count badge
   const activeCount = todos.filter(t => !t.done).length;
   const countEl = document.getElementById('todo-count');
   if (countEl) countEl.textContent = activeCount > 0 ? String(activeCount) : '';
 
-  // Clear-done button visibility
   const clearBtn = document.getElementById('btn-clear-done') as HTMLElement;
   clearBtn?.classList.toggle('hidden', !todos.some(t => t.done));
 
@@ -195,58 +273,47 @@ function renderTodos() {
     return;
   }
 
-  visible.forEach((todo) => {
-    const li = document.createElement('li');
-    const pri = todo.priority ?? 'none';
-    li.className = `todo-item${todo.done ? ' done' : ''}${pri !== 'none' ? ` pri-${pri}` : ''}`;
+  // Group by due date bucket
+  const today = todayString();
+  const groups = new Map<string, Todo[]>();
 
-    // Checkbox
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.className = 'todo-cb'; cb.checked = todo.done;
-    cb.addEventListener('change', () => {
-      todo.done = cb.checked;
-      saveTodos(todos);
-      renderTodos(); renderFmTodos(); updatePomoTask();
-    });
+  const pastKey = '__past__';
+  const todayKey = 'Today';
+  const noneKey = '__none__';
 
-    // Text + priority badge
-    const textWrap = document.createElement('div');
-    textWrap.className = 'todo-text-wrap';
-    const span = document.createElement('span');
-    span.textContent = todo.text;
-    const priBadge = document.createElement('span');
-    priBadge.className = 'todo-pri-badge';
-    priBadge.textContent = pri === 'high' ? 'High priority' : pri === 'medium' ? 'Medium' : '';
-    textWrap.append(span, priBadge);
+  visible.forEach(todo => {
+    let key: string;
+    if (!todo.dueDate) key = noneKey;
+    else if (todo.dueDate < today) key = pastKey;
+    else if (todo.dueDate === today) key = todayKey;
+    else key = todo.dueDate; // YYYY-MM-DD for future sorting
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(todo);
+  });
 
-    // Actions: focus + delete
-    const actions = document.createElement('div');
-    actions.className = 'todo-item-actions';
+  // Order: past → today → future dates (sorted) → no due date
+  const orderedKeys: string[] = [];
+  if (groups.has(pastKey)) orderedKeys.push(pastKey);
+  if (groups.has(todayKey)) orderedKeys.push(todayKey);
+  const futureKeys = [...groups.keys()].filter(k => k !== pastKey && k !== todayKey && k !== noneKey).sort();
+  orderedKeys.push(...futureKeys);
+  if (groups.has(noneKey)) orderedKeys.push(noneKey);
 
-    if (!todo.done) {
-      const focusBtn = document.createElement('button');
-      focusBtn.className = 'focus-task-btn';
-      focusBtn.title = 'Start focus session on this task';
-      focusBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
-      focusBtn.addEventListener('click', () => {
-        document.getElementById('pomodoro-panel')?.classList.add('hidden');
-        enterFocusMode();
-        if (fmTaskLabelEl) fmTaskLabelEl.textContent = todo.text;
-      });
-      actions.appendChild(focusBtn);
-    }
+  orderedKeys.forEach(key => {
+    const items = groups.get(key)!;
 
-    const del = document.createElement('button');
-    del.className = 'del-btn'; del.title = 'Delete';
-    del.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-    del.addEventListener('click', () => {
-      todos = todos.filter(t => t.id !== todo.id);
-      saveTodos(todos); renderTodos(); renderFmTodos(); updatePomoTask();
-    });
-    actions.appendChild(del);
+    // Section header
+    const header = document.createElement('li');
+    header.className = 'todo-section-header';
+    let label = '';
+    if (key === pastKey) label = 'Past';
+    else if (key === todayKey) label = 'Today';
+    else if (key === noneKey) label = 'No due date';
+    else label = dueDateLabel(key);
+    header.textContent = label;
+    list.appendChild(header);
 
-    li.append(cb, textWrap, actions);
-    list.appendChild(li);
+    items.forEach(todo => list.appendChild(buildTodoItem(todo)));
   });
 }
 
@@ -279,6 +346,21 @@ async function initTodos() {
     priBtn.dataset['pri'] = PRIS[priIdx];
   });
 
+  // Date picker toggle
+  const dateBtn = document.getElementById('todo-date-btn') as HTMLButtonElement;
+  const dueDateInput = document.getElementById('todo-due-date') as HTMLInputElement;
+  dateBtn?.addEventListener('click', () => {
+    if (dueDateInput.classList.toggle('visible')) {
+      dueDateInput.showPicker?.();
+      dueDateInput.focus();
+    } else {
+      dueDateInput.value = '';
+    }
+  });
+  dueDateInput?.addEventListener('change', () => {
+    dateBtn?.classList.toggle('has-date', !!dueDateInput.value);
+  });
+
   // Add task form
   const form = document.getElementById('todo-form') as HTMLFormElement;
   const input = document.getElementById('todo-input') as HTMLInputElement;
@@ -287,9 +369,11 @@ async function initTodos() {
     const text = input.value.trim();
     if (!text) return;
     const priority = (priBtn?.dataset['pri'] ?? 'none') as Todo['priority'];
-    todos.push({ id: Date.now().toString(), text, done: false, priority });
-    // Reset priority
+    const dueDate = dueDateInput?.value || undefined;
+    todos.push({ id: Date.now().toString(), text, done: false, priority, dueDate });
     priIdx = 0; if (priBtn) priBtn.dataset['pri'] = 'none';
+    if (dueDateInput) { dueDateInput.value = ''; dueDateInput.classList.remove('visible'); }
+    dateBtn?.classList.remove('has-date');
     saveTodos(todos); renderTodos(); renderFmTodos(); input.value = ''; updatePomoTask();
   });
 }
