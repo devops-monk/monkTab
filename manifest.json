@@ -40,6 +40,8 @@
     "https://api.alternative.me/*",
     "https://hn.algolia.com/*",
     "https://hacker-news.firebaseio.com/*",
-    "https://dev.to/*"
+    "https://dev.to/*",
+    "https://www.reddit.com/*",
+    "https://oauth.reddit.com/*"
   ]
 }

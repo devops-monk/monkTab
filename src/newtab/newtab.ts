@@ -1209,82 +1209,106 @@ async function fetchHNRising(): Promise<NewsItem[]> {
   })).filter((i: NewsItem) => i.title);
 }
 
-async function fetchHNByQuery(query: string, days = 7, minPoints = 20): Promise<NewsItem[]> {
-  const since = Math.floor(Date.now() / 1000) - days * 86400;
-  const url = `https://hn.algolia.com/api/v1/search?tags=story&query=${encodeURIComponent(query)}&numericFilters=points>${minPoints},created_at_i>${since}&hitsPerPage=25`;
-  const r = await fetch(url, { signal: AbortSignal.timeout(7000) });
-  const data = await r.json();
-  return (data.hits ?? []).map((h: any) => ({
-    id: h.objectID,
-    title: h.title ?? h.story_title ?? '',
-    url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,
-    score: h.points ?? 0,
-    by: h.author ?? '',
-    time: Math.floor(new Date(h.created_at).getTime() / 1000),
-    comments: h.num_comments ?? 0,
-    domain: h.url ? newsExtractDomain(h.url) : 'news.ycombinator.com',
-  })).filter((i: NewsItem) => i.title);
+async function fetchReddit(subreddits: string[]): Promise<NewsItem[]> {
+  const results = await Promise.allSettled(
+    subreddits.map(sub =>
+      fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=25&raw_json=1`, { signal: AbortSignal.timeout(7000) })
+        .then(r => r.json())
+    )
+  );
+  const all: NewsItem[] = [];
+  results.forEach(res => {
+    if (res.status !== 'fulfilled') return;
+    const children: any[] = res.value?.data?.children ?? [];
+    children.forEach(({ data: d }) => {
+      if (!d.title || d.stickied || d.score < 10) return;
+      all.push({
+        id: `r_${d.id}`,
+        title: d.title,
+        url: d.is_self ? `https://www.reddit.com${d.permalink}` : (d.url ?? `https://www.reddit.com${d.permalink}`),
+        score: d.score ?? 0,
+        by: d.author ?? '',
+        time: Math.floor(d.created_utc),
+        comments: d.num_comments ?? 0,
+        domain: d.is_self ? `r/${d.subreddit}` : (d.domain ?? 'reddit.com'),
+      });
+    });
+  });
+  const seen = new Set<string>();
+  return all
+    .filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
+}
+
+async function fetchDevTo(tags: string): Promise<NewsItem[]> {
+  const r = await fetch(
+    `https://dev.to/api/articles?tags=${tags}&per_page=20&top=7`,
+    { signal: AbortSignal.timeout(7000) }
+  );
+  const data: any[] = await r.json();
+  return data.map(a => ({
+    id: `dt_${a.id}`,
+    title: a.title ?? '',
+    url: a.url ?? `https://dev.to${a.path ?? ''}`,
+    score: a.public_reactions_count ?? 0,
+    by: a.user?.name ?? a.user?.username ?? '',
+    time: Math.floor(new Date(a.published_at).getTime() / 1000),
+    comments: a.comments_count ?? 0,
+    domain: 'dev.to',
+  })).filter(i => i.title);
+}
+
+function mergeNewsItems(...lists: Array<NewsItem[]>): NewsItem[] {
+  const seen = new Set<string>();
+  return lists.flat()
+    .filter(i => seen.has(String(i.id)) ? false : (seen.add(String(i.id)), true))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
 }
 
 async function fetchAINews(): Promise<NewsItem[]> {
-  // Merge two HN queries for broader AI coverage
-  const [general, models] = await Promise.allSettled([
-    fetchHNByQuery('AI LLM GPT Claude OpenAI Anthropic Gemini model', 7, 30),
-    fetchHNByQuery('machine learning neural network transformer', 7, 40),
+  const [reddit, devto] = await Promise.allSettled([
+    fetchReddit(['MachineLearning', 'LocalLLaMA', 'artificial', 'OpenAI']),
+    fetchDevTo('ai,machinelearning,llm,openai'),
   ]);
-  const all = [
-    ...(general.status === 'fulfilled' ? general.value : []),
-    ...(models.status === 'fulfilled' ? models.value : []),
-  ];
-  const seen = new Set<string>();
-  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 20);
+  return mergeNewsItems(
+    reddit.status === 'fulfilled' ? reddit.value : [],
+    devto.status === 'fulfilled' ? devto.value : [],
+  );
 }
 
 async function fetchReleasesNews(): Promise<NewsItem[]> {
-  const [releases, show] = await Promise.allSettled([
-    fetchHNByQuery('release version React Java Spring Python Rust Go TypeScript Next.js', 14, 20),
-    fetchHNByQuery('Show HN new version framework library open source released', 7, 10),
+  const [reddit, devto] = await Promise.allSettled([
+    fetchReddit(['programming', 'webdev', 'javascript', 'java', 'Python']),
+    fetchDevTo('javascript,typescript,python,java,webdev,react'),
   ]);
-  const all = [
-    ...(releases.status === 'fulfilled' ? releases.value : []),
-    ...(show.status === 'fulfilled' ? show.value : []),
-  ];
-  const seen = new Set<string>();
-  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 20);
+  return mergeNewsItems(
+    reddit.status === 'fulfilled' ? reddit.value : [],
+    devto.status === 'fulfilled' ? devto.value : [],
+  );
 }
 
 async function fetchSecurityNews(): Promise<NewsItem[]> {
-  const [cve, breach] = await Promise.allSettled([
-    fetchHNByQuery('CVE vulnerability exploit zero-day patch security advisory', 14, 15),
-    fetchHNByQuery('data breach hack ransomware malware phishing attack', 7, 30),
+  const [reddit, devto] = await Promise.allSettled([
+    fetchReddit(['netsec', 'cybersecurity', 'hacking']),
+    fetchDevTo('security,cybersecurity,hacking'),
   ]);
-  const all = [
-    ...(cve.status === 'fulfilled' ? cve.value : []),
-    ...(breach.status === 'fulfilled' ? breach.value : []),
-  ];
-  const seen = new Set<string>();
-  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 20);
+  return mergeNewsItems(
+    reddit.status === 'fulfilled' ? reddit.value : [],
+    devto.status === 'fulfilled' ? devto.value : [],
+  );
 }
 
 async function fetchCloudNews(): Promise<NewsItem[]> {
-  const [cloud, devops] = await Promise.allSettled([
-    fetchHNByQuery('AWS Azure GCP cloud infrastructure serverless lambda S3 EKS', 7, 25),
-    fetchHNByQuery('Kubernetes Docker DevOps CI/CD microservices architecture design pattern', 7, 25),
+  const [reddit, devto] = await Promise.allSettled([
+    fetchReddit(['aws', 'devops', 'kubernetes', 'docker', 'sysadmin']),
+    fetchDevTo('devops,cloud,aws,kubernetes,docker'),
   ]);
-  const all = [
-    ...(cloud.status === 'fulfilled' ? cloud.value : []),
-    ...(devops.status === 'fulfilled' ? devops.value : []),
-  ];
-  const seen = new Set<string>();
-  return all.filter(i => seen.has(i.id as string) ? false : (seen.add(i.id as string), true))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 20);
+  return mergeNewsItems(
+    reddit.status === 'fulfilled' ? reddit.value : [],
+    devto.status === 'fulfilled' ? devto.value : [],
+  );
 }
 
 function renderNewsSkeleton() {
