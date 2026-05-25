@@ -57,6 +57,13 @@ export interface DailyState {
   quoteAuthor: string;
 }
 
+export interface WeatherForecastDay {
+  day: string;   // e.g. "Mon"
+  icon: string;
+  hi: number;
+  lo: number;
+}
+
 export interface WeatherCache {
   temp: number;
   feelsLike: number;
@@ -66,6 +73,7 @@ export interface WeatherCache {
   icon: string;
   city: string;
   cachedAt: number;
+  forecast?: WeatherForecastDay[];
 }
 
 export interface FocusDay {

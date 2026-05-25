@@ -95,10 +95,25 @@ async function loadWeather(locationOverride = '') {
   (document.getElementById('wc-city') as HTMLElement).textContent = w.city;
   (document.getElementById('wc-condition') as HTMLElement).textContent = w.condition;
   (document.getElementById('wc-icon') as HTMLElement).textContent = w.icon;
-  (document.getElementById('wc-temp') as HTMLElement).textContent = `${w.temp}°`;
+  (document.getElementById('wc-temp') as HTMLElement).textContent = String(w.temp);
   (document.getElementById('wc-feels') as HTMLElement).textContent = `${w.feelsLike ?? w.temp}°C`;
   (document.getElementById('wc-wind') as HTMLElement).textContent = `${w.windSpeed ?? '--'} km/h`;
   (document.getElementById('wc-rain') as HTMLElement).textContent = `${w.precipitation ?? 0} mm`;
+
+  // 7-day forecast
+  const forecastEl = document.getElementById('wc-forecast') as HTMLElement;
+  forecastEl.innerHTML = '';
+  (w.forecast ?? []).forEach(day => {
+    const col = document.createElement('div');
+    col.className = 'wc-fc-day';
+    col.innerHTML = `
+      <span class="wc-fc-label">${day.day}</span>
+      <span class="wc-fc-icon">${day.icon}</span>
+      <span class="wc-fc-hi">${day.hi}°</span>
+      <span class="wc-fc-lo">${day.lo}°</span>
+    `;
+    forecastEl.appendChild(col);
+  });
 
   // Toggle expanded card on click
   const card = document.getElementById('weather-card') as HTMLElement;

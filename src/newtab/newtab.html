@@ -52,36 +52,43 @@
 
       <!-- Expanded weather card -->
       <div id="weather-card" class="weather-card hidden">
-        <div class="wc-top">
-          <div class="wc-city-row">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5.25-8 13-8 13S4 15.25 4 10a8 8 0 0 1 8-8z"/></svg>
-            <span id="wc-city">—</span>
-          </div>
-          <span id="wc-condition" class="wc-condition">—</span>
+        <!-- City header -->
+        <div class="wc-header">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5.25-8 13-8 13S4 15.25 4 10a8 8 0 0 1 8-8z"/></svg>
+          <span id="wc-city">—</span>
         </div>
-        <div class="wc-main">
-          <div class="wc-temp-block">
-            <span id="wc-icon" class="wc-icon">🌤️</span>
-            <span id="wc-temp" class="wc-temp">--°</span>
+
+        <!-- Main: icon + temp + details -->
+        <div class="wc-body">
+          <div class="wc-left">
+            <div id="wc-icon" class="wc-big-icon">🌤️</div>
+            <div id="wc-condition" class="wc-condition-label">—</div>
           </div>
-          <div class="wc-details">
-            <div class="wc-detail-row">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-              <span class="wc-detail-label">Feels like</span>
-              <span id="wc-feels" class="wc-detail-val">--°</span>
+          <div class="wc-right">
+            <div class="wc-temp-row">
+              <span id="wc-temp" class="wc-big-temp">--</span>
+              <span class="wc-deg">°</span>
             </div>
-            <div class="wc-detail-row">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>
-              <span class="wc-detail-label">Wind</span>
-              <span id="wc-wind" class="wc-detail-val">-- km/h</span>
-            </div>
-            <div class="wc-detail-row">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="18" x2="12" y2="20"/></svg>
-              <span class="wc-detail-label">Rain</span>
-              <span id="wc-rain" class="wc-detail-val">-- mm</span>
+            <div class="wc-stats">
+              <div class="wc-stat">
+                <span class="wc-stat-label">Feels like</span>
+                <span id="wc-feels" class="wc-stat-val">--°</span>
+              </div>
+              <div class="wc-stat">
+                <span class="wc-stat-label">Wind</span>
+                <span id="wc-wind" class="wc-stat-val">-- km/h</span>
+              </div>
+              <div class="wc-stat">
+                <span class="wc-stat-label">Rain</span>
+                <span id="wc-rain" class="wc-stat-val">-- mm</span>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- 7-day forecast -->
+        <div class="wc-divider"></div>
+        <div id="wc-forecast" class="wc-forecast"></div>
       </div>
       <button class="icon-btn" id="btn-settings" title="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>

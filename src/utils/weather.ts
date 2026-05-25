@@ -1,4 +1,4 @@
-import { getWeatherCache, saveWeatherCache, type WeatherCache } from './storage';
+import { getWeatherCache, saveWeatherCache, type WeatherCache, type WeatherForecastDay } from './storage';
 
 const WMO_CODES: Record<number, { label: string; icon: string }> = {
   0:  { label: 'Clear sky',       icon: '☀️' },
@@ -29,7 +29,8 @@ async function fetchWeatherForCoords(lat: number, lon: number, city: string): Pr
   const wxRes = await fetch(
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code` +
-    `&wind_speed_unit=kmh&temperature_unit=celsius`
+    `&daily=temperature_2m_max,temperature_2m_min,weather_code` +
+    `&wind_speed_unit=kmh&temperature_unit=celsius&timezone=auto`
   );
   const wxData = await wxRes.json() as {
     current: {
@@ -39,9 +40,26 @@ async function fetchWeatherForCoords(lat: number, lon: number, city: string): Pr
       wind_speed_10m: number;
       weather_code: number;
     };
+    daily?: {
+      time: string[];
+      temperature_2m_max: number[];
+      temperature_2m_min: number[];
+      weather_code: number[];
+    };
   };
   const c = wxData.current;
   const { label, icon } = getCondition(c.weather_code);
+
+  const forecast: WeatherForecastDay[] = (wxData.daily?.time ?? []).slice(0, 7).map((dateStr, i) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    return {
+      day: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+      icon: getCondition(wxData.daily!.weather_code[i]).icon,
+      hi: Math.round(wxData.daily!.temperature_2m_max[i]),
+      lo: Math.round(wxData.daily!.temperature_2m_min[i]),
+    };
+  });
+
   return {
     temp: Math.round(c.temperature_2m),
     feelsLike: Math.round(c.apparent_temperature),
@@ -51,6 +69,7 @@ async function fetchWeatherForCoords(lat: number, lon: number, city: string): Pr
     icon,
     city,
     cachedAt: Date.now(),
+    forecast,
   };
 }
 
@@ -72,7 +91,7 @@ export async function fetchWeather(locationOverride = ''): Promise<WeatherCache 
   const cached = await getWeatherCache();
 
   // Use cache only if location override hasn't changed
-  if (cached && Date.now() - cached.cachedAt < 30 * 60 * 1000) {
+  if (cached && Date.now() - cached.cachedAt < 15 * 60 * 1000) {
     // If override is set but cached city doesn't reflect it, bust the cache
     const overrideName = locationOverride.trim().toLowerCase();
     if (!overrideName || cached.city.toLowerCase().includes(overrideName.split(',')[0].trim())) {
