@@ -875,12 +875,18 @@ function parseYouTubeId(input: string): string | null {
 }
 
 async function fetchYtTitle(id: string): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
+    const r = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`,
+      { signal: controller.signal },
+    );
     if (!r.ok) return 'Custom Video';
     const d = await r.json();
     return (d.title as string) || 'Custom Video';
   } catch { return 'Custom Video'; }
+  finally { clearTimeout(timer); }
 }
 
 function buildYtCard(

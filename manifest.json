@@ -33,6 +33,7 @@
     "https://picsum.photos/*",
     "https://fastly.picsum.photos/*",
     "https://img.youtube.com/*",
-    "https://www.youtube-nocookie.com/*"
+    "https://www.youtube-nocookie.com/*",
+    "https://www.youtube.com/*"
   ]
 }
