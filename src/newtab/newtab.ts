@@ -1906,6 +1906,7 @@ let activeYtCh = '';
 let activeYtId = '';
 let ytPlayStartedAt = 0;
 let ytIsPaused = false;
+let ytPausedPosition = 0; // seconds elapsed when paused; used to resume from correct position
 
 // Playback modes
 let ytShuffle = false;
@@ -2079,17 +2080,16 @@ window.addEventListener('message', (e) => {
       ytPlayNext();
     } else if (data.info === 2) {
       ytIsPaused = true;
+      ytPausedPosition = Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
       updatePausePlayUI();
-      const pos = (Date.now() - ytPlayStartedAt) / 1000;
-      void getYtPlayState().then(s => { if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition: pos }); });
+      void getYtPlayState().then(s => { if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition: ytPausedPosition }); });
     } else if (data.info === 1) {
       ytIsPaused = false;
+      ytPlayStartedAt = Date.now() - ytPausedPosition * 1000;
+      ytPausedPosition = 0;
       updatePausePlayUI();
       void getYtPlayState().then(s => {
-        if (s) {
-          ytPlayStartedAt = Date.now() - (s.pausedPosition ?? 0) * 1000;
-          void saveYtPlayState({ ...s, isPaused: false, pausedPosition: 0, startedAt: ytPlayStartedAt });
-        }
+        if (s) void saveYtPlayState({ ...s, isPaused: false, pausedPosition: 0, startedAt: ytPlayStartedAt });
       });
     }
   } catch { /* non-JSON */ }
@@ -2125,7 +2125,7 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     // Guard: iframe not yet loaded (e.g. restored paused state) — origin mismatch would occur
     if (!activeYtIframe.src.includes('youtube-nocookie.com')) return;
     const current = ytIsPaused
-      ? 0  // approximate; we don't track pausedPosition here cleanly
+      ? ytPausedPosition
       : Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
     const newPos = Math.max(0, current + deltaSec);
     activeYtIframe.contentWindow?.postMessage(
@@ -2225,9 +2225,11 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   // Now Playing controls
   ytNpPausePlayBtn?.addEventListener('click', () => {
     if (!activeYtIframe) return;
-    // If paused and iframe not loaded (restored from saved state), start fresh playback
+    // If paused and iframe not loaded (restored from saved state), resume from saved position
     if (ytIsPaused && activeYtId && !activeYtIframe.src.includes('youtube-nocookie.com')) {
-      playYtVideo(activeYtId, activeYtTitle, activeYtCh);
+      const resumeAt = ytPausedPosition;
+      ytPausedPosition = 0;
+      playYtVideo(activeYtId, activeYtTitle, activeYtCh, resumeAt);
       return;
     }
     const cmd = ytIsPaused ? 'playVideo' : 'pauseVideo';
@@ -2295,6 +2297,7 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     rebuildPlaylist();
     updateNowPlayingView(savedState.id, savedState.title, savedState.ch);
     ytIsPaused = true;
+    ytPausedPosition = savedState.pausedPosition ?? 0;
     updatePausePlayUI();
     switchYtPane('nowplaying');
   }
