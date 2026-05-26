@@ -50,3 +50,25 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
   installYouTubeRefererRule();
 });
+
+// ─── Focus Mode site blocking ─────────────────────────────────────────────────
+// Redirects blocked domains to the new tab page while Focus Mode is active.
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== 'loading' || !tab.url) return;
+  const r = await chrome.storage.local.get(['mt_focus_blocking', 'mt_settings']);
+  if (!r['mt_focus_blocking']) return;
+  const blockedSites: string[] = (r['mt_settings'] as { blockedSites?: string[] } | undefined)?.blockedSites ?? [];
+  if (!blockedSites.length) return;
+  try {
+    const hostname = new URL(tab.url).hostname.replace(/^www\./, '');
+    const blocked = blockedSites.some(s => {
+      const d = s.replace(/^www\./, '').toLowerCase();
+      return hostname === d || hostname.endsWith('.' + d);
+    });
+    if (blocked) {
+      const newTabUrl = chrome.runtime.getURL('src/newtab/newtab.html') + '?blocked=' + encodeURIComponent(tab.url);
+      await chrome.tabs.update(tabId, { url: newTabUrl });
+    }
+  } catch { /* invalid URL */ }
+});

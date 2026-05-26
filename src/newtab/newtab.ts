@@ -3,8 +3,10 @@ import {
   getLinks, saveLinks, getFolders, saveFolders, getNotes, saveNotes, getCountdowns, saveCountdowns,
   getFocusHistory, logFocusSession, getCustomYtVideos, saveCustomYtVideos,
   getYtPlayState, saveYtPlayState, clearYtPlayState, getYtRecent, addYtRecent,
+  getHabits, saveHabits, getTodayHabitLog, saveHabitLog, getHabitStreak,
+  getJournalEntries, saveJournalEntry,
   todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
-  type CustomYtVideo, type YtPlayState, type WatchItem,
+  type CustomYtVideo, type YtPlayState, type WatchItem, type Habit, type JournalEntry,
   getWatchlist, saveWatchlist,
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
@@ -2322,6 +2324,227 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   });
 }
 
+// ─── Habit Tracker ────────────────────────────────────────────────────────────
+
+async function initHabits() {
+  const panel = document.getElementById('habits-panel') as HTMLElement;
+  const list  = document.getElementById('habit-list') as HTMLUListElement;
+  const empty = document.getElementById('habit-empty') as HTMLElement;
+  const form  = document.getElementById('habit-add-form') as HTMLFormElement;
+  const emojiInput = document.getElementById('habit-emoji-input') as HTMLInputElement;
+  const labelInput = document.getElementById('habit-label-input') as HTMLInputElement;
+  const dateEl = document.getElementById('habit-date') as HTMLElement;
+
+  const today = todayString();
+  dateEl.textContent = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  let habits = await getHabits();
+  let log = await getTodayHabitLog();
+
+  async function renderHabits() {
+    habits = await getHabits();
+    log = await getTodayHabitLog();
+    list.innerHTML = '';
+    empty.classList.toggle('hidden', habits.length > 0);
+
+    for (const habit of habits) {
+      const streak = await getHabitStreak(habit.id);
+      const done = !!log.done[habit.id];
+
+      const li = document.createElement('li');
+      li.className = 'habit-item' + (done ? ' habit-done' : '');
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'habit-cb'; cb.checked = done;
+      cb.addEventListener('change', async () => {
+        log.done[habit.id] = cb.checked;
+        await saveHabitLog({ date: today, done: log.done });
+        li.classList.toggle('habit-done', cb.checked);
+        streakEl.textContent = cb.checked ? String(streak + 1) + '🔥' : (streak > 0 ? String(streak) + '🔥' : '');
+      });
+
+      const emoji = document.createElement('span');
+      emoji.className = 'habit-emoji'; emoji.textContent = habit.emoji || '🎯';
+
+      const label = document.createElement('span');
+      label.className = 'habit-label'; label.textContent = habit.label;
+
+      const streakEl = document.createElement('span');
+      streakEl.className = 'habit-streak';
+      streakEl.textContent = streak > 0 ? String(streak) + '🔥' : '';
+
+      const del = document.createElement('button');
+      del.className = 'habit-del'; del.title = 'Remove'; del.textContent = '✕';
+      del.addEventListener('click', async () => {
+        habits = habits.filter(h => h.id !== habit.id);
+        await saveHabits(habits);
+        renderHabits();
+      });
+
+      li.append(cb, emoji, label, streakEl, del);
+      list.appendChild(li);
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const label = labelInput.value.trim();
+    if (!label) return;
+    const habit: Habit = { id: Date.now().toString(), label, emoji: emojiInput.value.trim() || '🎯' };
+    habits.push(habit);
+    await saveHabits(habits);
+    labelInput.value = ''; emojiInput.value = '';
+    renderHabits();
+  });
+
+  document.getElementById('btn-habits-toggle')?.addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) renderHabits();
+  });
+  document.getElementById('btn-habits-close')?.addEventListener('click', () => panel.classList.add('hidden'));
+
+  await renderHabits();
+}
+
+// ─── Daily Journal ─────────────────────────────────────────────────────────────
+
+const JOURNAL_PROMPTS = [
+  'What are you grateful for today?',
+  'What\'s one thing you want to accomplish today?',
+  'What did you learn yesterday?',
+  'What\'s challenging you right now?',
+  'What made you smile recently?',
+  'What are you looking forward to?',
+  'What would make today a success?',
+  'How are you feeling right now?',
+  'What\'s your biggest priority this week?',
+  'Describe a recent win, big or small.',
+  'What habit do you want to build?',
+  'What\'s one thing you could do differently today?',
+  'Who has positively influenced you lately?',
+  'What do you need to let go of?',
+  'What excites you about your work right now?',
+  'What\'s one thing you\'re proud of this week?',
+  'How are you taking care of yourself today?',
+  'What\'s a goal you\'ve been putting off?',
+  'What would your future self thank you for today?',
+  'What\'s the best thing that happened recently?',
+];
+
+function getTodayPrompt(): string {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  return JOURNAL_PROMPTS[dayOfYear % JOURNAL_PROMPTS.length]!;
+}
+
+async function initJournal() {
+  const panel    = document.getElementById('journal-panel') as HTMLElement;
+  const promptEl = document.getElementById('journal-prompt') as HTMLElement;
+  const textarea = document.getElementById('journal-textarea') as HTMLTextAreaElement;
+  const badge    = document.getElementById('journal-saved-badge') as HTMLElement;
+  const histBtn  = document.getElementById('btn-journal-history') as HTMLButtonElement;
+  const histEl   = document.getElementById('journal-history') as HTMLElement;
+
+  const today  = todayString();
+  const prompt = getTodayPrompt();
+  promptEl.textContent = prompt;
+
+  // Load today's entry if it exists
+  const entries = await getJournalEntries();
+  const todayEntry = entries.find(e => e.date === today);
+  if (todayEntry) textarea.value = todayEntry.text;
+
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  textarea.addEventListener('input', () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    badge.classList.add('hidden');
+    saveTimer = setTimeout(async () => {
+      await saveJournalEntry({ date: today, prompt, text: textarea.value });
+      badge.classList.remove('hidden');
+      setTimeout(() => badge.classList.add('hidden'), 2000);
+    }, 800);
+  });
+
+  histBtn.addEventListener('click', async () => {
+    const open = !histEl.classList.contains('hidden');
+    histEl.classList.toggle('hidden', open);
+    histBtn.textContent = open ? 'Past entries ▾' : 'Past entries ▴';
+    if (!open) {
+      const all = (await getJournalEntries()).filter(e => e.date !== today).reverse().slice(0, 30);
+      histEl.innerHTML = all.length === 0
+        ? '<p class="journal-hist-empty">No past entries yet.</p>'
+        : all.map(e => `
+            <div class="journal-hist-entry">
+              <div class="journal-hist-date">${e.date}</div>
+              <div class="journal-hist-prompt">${e.prompt}</div>
+              <div class="journal-hist-text">${e.text || '<em>No entry</em>'}</div>
+            </div>`).join('');
+    }
+  });
+
+  document.getElementById('btn-journal-toggle')?.addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+  });
+  document.getElementById('btn-journal-close')?.addEventListener('click', () => panel.classList.add('hidden'));
+}
+
+// ─── Blocked-site banner ───────────────────────────────────────────────────────
+
+function initBlockedBanner() {
+  const params = new URLSearchParams(window.location.search);
+  const blocked = params.get('blocked');
+  if (!blocked) return;
+  const banner = document.getElementById('blocked-banner') as HTMLElement;
+  banner.classList.remove('hidden');
+  document.getElementById('btn-blocked-back')?.addEventListener('click', () => {
+    history.back();
+  });
+  // Clean up the URL so refreshing doesn't re-show the banner
+  history.replaceState({}, '', window.location.pathname);
+}
+
+// ─── Blocked sites settings ────────────────────────────────────────────────────
+
+function renderBlockedSitesList(sites: string[]) {
+  const ul = document.getElementById('blocked-sites-list') as HTMLUListElement;
+  ul.innerHTML = '';
+  if (sites.length === 0) {
+    ul.innerHTML = '<li class="blocked-site-empty">No sites blocked yet</li>';
+    return;
+  }
+  sites.forEach((site, i) => {
+    const li = document.createElement('li');
+    li.className = 'blocked-site-item';
+    const span = document.createElement('span'); span.textContent = site;
+    const del = document.createElement('button');
+    del.className = 'blocked-site-del'; del.textContent = '✕'; del.title = 'Remove';
+    del.addEventListener('click', async () => {
+      const newSites = sites.filter((_, j) => j !== i);
+      await saveSettings({ blockedSites: newSites });
+      renderBlockedSitesList(newSites);
+    });
+    li.append(span, del);
+    ul.appendChild(li);
+  });
+}
+
+function initBlockedSitesSettings(settings: Settings) {
+  const form  = document.getElementById('blocked-site-form') as HTMLFormElement;
+  const input = document.getElementById('blocked-site-input') as HTMLInputElement;
+  let sites   = settings.blockedSites ?? [];
+
+  renderBlockedSitesList(sites);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    let domain = input.value.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0] ?? '';
+    if (!domain || sites.includes(domain)) { input.value = ''; return; }
+    sites = [...sites, domain];
+    await saveSettings({ blockedSites: sites });
+    renderBlockedSitesList(sites);
+    input.value = '';
+  });
+}
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 
 function initSearch(engine: string) {
@@ -2584,6 +2807,8 @@ function updateFmSoundChip() {
 
 function enterFocusMode() {
   focusModeActive = true;
+  // Activate site blocking in the background service worker
+  void chrome.storage.local.set({ mt_focus_blocking: true });
   const overlay = document.getElementById('focus-mode') as HTMLElement;
   overlay.classList.remove('hidden');
   fmTimeEl = document.getElementById('fm-time');
@@ -2605,6 +2830,7 @@ function enterFocusMode() {
 
 function exitFocusMode() {
   focusModeActive = false;
+  void chrome.storage.local.remove('mt_focus_blocking');
   document.getElementById('focus-mode')?.classList.add('hidden');
 }
 
@@ -2997,6 +3223,9 @@ function initSettingsPanel(settings: Settings) {
   (document.getElementById('set-countdowns') as HTMLInputElement).checked = settings.showCountdowns;
   (document.getElementById('set-github') as HTMLInputElement).checked = settings.showGithub;
   (document.getElementById('set-ai') as HTMLInputElement).checked = settings.showAi;
+  (document.getElementById('set-habits') as HTMLInputElement).checked = settings.showHabits;
+  (document.getElementById('set-journal') as HTMLInputElement).checked = settings.showJournal;
+  initBlockedSitesSettings(settings);
   (document.getElementById('set-unsplash') as HTMLInputElement).value = settings.unsplashKey;
   (document.getElementById('set-gh-user') as HTMLInputElement).value = settings.githubUsername;
   (document.getElementById('set-gh-token') as HTMLInputElement).value = settings.githubToken;
@@ -3043,6 +3272,8 @@ function initSettingsPanel(settings: Settings) {
       showCountdowns: (document.getElementById('set-countdowns') as HTMLInputElement).checked,
       showGithub: (document.getElementById('set-github') as HTMLInputElement).checked,
       showAi: (document.getElementById('set-ai') as HTMLInputElement).checked,
+      showHabits: (document.getElementById('set-habits') as HTMLInputElement).checked,
+      showJournal: (document.getElementById('set-journal') as HTMLInputElement).checked,
       unsplashKey: (document.getElementById('set-unsplash') as HTMLInputElement).value.trim(),
       githubUsername: (document.getElementById('set-gh-user') as HTMLInputElement).value.trim(),
       githubToken: (document.getElementById('set-gh-token') as HTMLInputElement).value.trim(),
@@ -3082,6 +3313,8 @@ function applyVisibility(s: Settings) {
   s.showAi ? show('btn-ai-toggle') : hide('btn-ai-toggle');
   s.showNotes ? show('btn-notes-toggle') : hide('btn-notes-toggle');
   s.showPomodoro ? show('pomodoro-panel') : hide('pomodoro-panel');
+  s.showHabits ? show('btn-habits-toggle') : hide('btn-habits-toggle');
+  s.showJournal ? show('btn-journal-toggle') : hide('btn-journal-toggle');
   if (!s.showLinks) hide('btn-links-toggle');
   if (s.showWorldClocks) show('world-clocks-bar'); else hide('world-clocks-bar');
 }
@@ -3134,6 +3367,9 @@ async function init() {
   initQuoteRefresh();
   initAI(settings.aiProvider);
   initSoundscapes();
+  await initHabits();
+  await initJournal();
+  initBlockedBanner();
 
   applyVisibility(settings);
 

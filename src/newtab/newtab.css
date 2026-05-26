@@ -1882,3 +1882,97 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   font-size: 13px; color: rgba(255,255,255,0.4); font-style: italic;
   max-width: 600px; margin: 0 auto;
 }
+
+/* ─── Habit Tracker ─────────────────────────────────────────────────────────── */
+.habits-panel {
+  position: fixed; top: 58px; left: 20px; width: 300px; max-height: calc(100vh - 100px);
+  display: flex; flex-direction: column;
+  background: rgba(18, 14, 32, 0.88); border: 1px solid rgba(167, 139, 250, 0.18);
+  border-radius: 16px; padding: 16px; z-index: 15; overflow: hidden;
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(167,139,250,0.08);
+  animation: panel-slide-in 0.2s ease;
+}
+@keyframes panel-slide-in { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+.habits-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.habits-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); letter-spacing: 0.01em; }
+.habits-title svg { color: #a78bfa; }
+.habits-header-right { display: flex; align-items: center; gap: 8px; }
+.habit-date { font-size: 11px; color: rgba(255,255,255,0.35); }
+.habit-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 320px; }
+.habit-item {
+  display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 11px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  transition: background 0.15s, opacity 0.2s;
+}
+.habit-item:hover { background: rgba(255,255,255,0.08); }
+.habit-done { opacity: 0.5; }
+.habit-cb { width: 16px; height: 16px; accent-color: #a78bfa; cursor: pointer; flex-shrink: 0; }
+.habit-emoji { font-size: 16px; line-height: 1; flex-shrink: 0; }
+.habit-label { flex: 1; font-size: 13px; color: rgba(255,255,255,0.85); }
+.habit-done .habit-label { text-decoration: line-through; color: rgba(255,255,255,0.4); }
+.habit-streak { font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; }
+.habit-del { background: none; border: none; color: rgba(255,255,255,0.25); cursor: pointer; padding: 2px 4px; border-radius: 6px; font-size: 11px; transition: color 0.15s; }
+.habit-del:hover { color: #f87171; }
+.habit-empty { font-size: 12px; color: rgba(255,255,255,0.3); text-align: center; margin: 10px 0; }
+.habit-add-form { display: flex; gap: 6px; margin-top: 4px; }
+.habit-emoji-input { width: 36px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 9px; padding: 7px 6px; color: #fff; font-size: 14px; text-align: center; }
+.habit-label-input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 9px; padding: 7px 10px; color: #fff; font-size: 12px; }
+.habit-label-input::placeholder, .habit-emoji-input::placeholder { color: rgba(255,255,255,0.3); }
+.habit-add-btn { background: rgba(167,139,250,0.2); border: 1px solid rgba(167,139,250,0.35); border-radius: 9px; color: #a78bfa; padding: 0 12px; cursor: pointer; font-size: 16px; transition: all 0.15s; }
+.habit-add-btn:hover { background: rgba(167,139,250,0.35); }
+
+/* ─── Daily Journal ──────────────────────────────────────────────────────────── */
+.journal-panel {
+  position: fixed; top: 58px; left: 330px; width: 340px; max-height: calc(100vh - 100px);
+  display: flex; flex-direction: column;
+  background: rgba(18, 14, 32, 0.88); border: 1px solid rgba(167, 139, 250, 0.18);
+  border-radius: 16px; padding: 16px; z-index: 15; overflow: hidden;
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(167,139,250,0.08);
+  animation: panel-slide-in 0.2s ease;
+}
+.journal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.journal-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); }
+.journal-title svg { color: #a78bfa; }
+.journal-prompt-wrap { background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.2); border-radius: 10px; padding: 10px 13px; margin-bottom: 10px; }
+.journal-prompt { font-size: 13px; color: #c4b5fd; font-style: italic; line-height: 1.5; margin: 0; }
+.journal-textarea {
+  flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 10px 12px; color: rgba(255,255,255,0.9); font-size: 13px;
+  line-height: 1.6; resize: none; min-height: 100px; font-family: inherit;
+  transition: border-color 0.15s;
+}
+.journal-textarea:focus { outline: none; border-color: rgba(167,139,250,0.4); }
+.journal-textarea::placeholder { color: rgba(255,255,255,0.25); }
+.journal-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.journal-saved-badge { font-size: 11px; color: #86efac; }
+.journal-history-btn { background: none; border: none; color: rgba(255,255,255,0.4); font-size: 11.5px; cursor: pointer; padding: 2px 0; transition: color 0.15s; }
+.journal-history-btn:hover { color: rgba(255,255,255,0.7); }
+.journal-history { margin-top: 10px; overflow-y: auto; max-height: 200px; display: flex; flex-direction: column; gap: 8px; }
+.journal-hist-entry { padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; }
+.journal-hist-date { font-size: 10.5px; color: rgba(255,255,255,0.35); margin-bottom: 3px; }
+.journal-hist-prompt { font-size: 11px; color: #c4b5fd; font-style: italic; margin-bottom: 5px; }
+.journal-hist-text { font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.5; white-space: pre-wrap; }
+.journal-hist-empty { font-size: 12px; color: rgba(255,255,255,0.3); text-align: center; }
+
+/* ─── Blocked-site banner ────────────────────────────────────────────────────── */
+.blocked-banner {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(30, 10, 10, 0.92); border: 1px solid rgba(248, 81, 73, 0.4);
+  border-radius: 12px; padding: 12px 18px; z-index: 20; backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  font-size: 13px; color: #fca5a5; animation: panel-slide-in 0.2s ease;
+}
+.blocked-back-btn { background: rgba(248,81,73,0.2); border: 1px solid rgba(248,81,73,0.4); border-radius: 8px; color: #fca5a5; padding: 5px 13px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.blocked-back-btn:hover { background: rgba(248,81,73,0.35); }
+
+/* ─── Blocked sites settings ─────────────────────────────────────────────────── */
+.blocked-sites-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.blocked-site-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; font-size: 12.5px; color: rgba(255,255,255,0.75); }
+.blocked-site-del { background: none; border: none; color: rgba(255,255,255,0.25); cursor: pointer; padding: 2px 5px; border-radius: 5px; font-size: 11px; transition: color 0.15s; }
+.blocked-site-del:hover { color: #f87171; }
+.blocked-site-empty { font-size: 12px; color: rgba(255,255,255,0.3); padding: 6px 0; }
+.blocked-site-form { display: flex; gap: 8px; }
+.blocked-site-form .set-input { flex: 1; }
