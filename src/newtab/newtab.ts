@@ -2369,6 +2369,27 @@ function renderPomo() {
   syncFocusMode();
 }
 
+function playPomoChime(isFocusEnd: boolean) {
+  try {
+    const ctx = new AudioContext();
+    // Two-tone chime: a pleasant descending or ascending pair
+    const notes = isFocusEnd ? [880, 660] : [660, 880]; // focus end: high→low, break end: low→high
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.28;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.35, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+      osc.start(t); osc.stop(t + 0.55);
+    });
+    setTimeout(() => ctx.close(), 1500);
+  } catch { /* AudioContext unavailable */ }
+}
+
 function initPomodoro() {
   document.querySelectorAll<HTMLButtonElement>('.pomo-tab').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2400,6 +2421,7 @@ function initPomodoro() {
             type: 'basic', iconUrl: '/icons/icon48.png', title: 'MonkTab',
             message: pomoMode === 'focus' ? 'Focus session done! Take a break.' : 'Break over — back to it!',
           });
+          playPomoChime(pomoMode === 'focus');
           pomoMode = pomoMode === 'focus' ? 'break' : 'focus';
           pomoSecondsLeft = POMO_DURATIONS[pomoMode];
           renderPomo();
