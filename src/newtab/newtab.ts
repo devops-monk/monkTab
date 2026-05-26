@@ -2236,6 +2236,11 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     activeYtIframe.contentWindow?.postMessage(`{"event":"command","func":"${cmd}","args":""}`, '*');
     // Optimistic UI update — don't wait for YouTube's state-change echo
     ytIsPaused = !ytIsPaused;
+    if (ytIsPaused) {
+      // Save paused position immediately so other tabs can read it right away
+      ytPausedPosition = Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
+      void getYtPlayState().then(s => { if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition: ytPausedPosition }); });
+    }
     updatePausePlayUI();
   });
   document.getElementById('yt-np-prev')?.addEventListener('click', ytPlayPrev);
@@ -2297,7 +2302,11 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     rebuildPlaylist();
     updateNowPlayingView(savedState.id, savedState.title, savedState.ch);
     ytIsPaused = true;
-    ytPausedPosition = savedState.pausedPosition ?? 0;
+    // If the track was paused, use the saved paused position.
+    // If it was still playing in the other tab, estimate current position from startedAt.
+    ytPausedPosition = savedState.isPaused
+      ? (savedState.pausedPosition ?? 0)
+      : Math.max(0, (Date.now() - savedState.startedAt) / 1000);
     updatePausePlayUI();
     switchYtPane('nowplaying');
   }
