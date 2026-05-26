@@ -2225,6 +2225,9 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     if (!activeYtIframe) return;
     const cmd = ytIsPaused ? 'playVideo' : 'pauseVideo';
     activeYtIframe.contentWindow?.postMessage(`{"event":"command","func":"${cmd}","args":""}`, '*');
+    // Optimistic UI update — don't wait for YouTube's state-change echo
+    ytIsPaused = !ytIsPaused;
+    updatePausePlayUI();
   });
   document.getElementById('yt-np-prev')?.addEventListener('click', ytPlayPrev);
   document.getElementById('yt-np-next')?.addEventListener('click', ytPlayNext);
@@ -2278,23 +2281,15 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
 
   renderGrid();
 
-  // Cross-tab / new-tab auto-resume
+  // Restore last-played track as paused — never auto-play in a new tab
+  // (prevents music starting in every new tab and multiple tabs playing simultaneously)
   const savedState = await getYtPlayState();
   if (savedState && Date.now() - savedState.startedAt < 8 * 3600 * 1000) {
     rebuildPlaylist();
-    const elapsed = savedState.isPaused
-      ? savedState.pausedPosition
-      : (Date.now() - savedState.startedAt) / 1000;
-    if (savedState.isPaused) {
-      // Show Now Playing in paused state without auto-playing
-      updateNowPlayingView(savedState.id, savedState.title, savedState.ch);
-      ytIsPaused = true;
-      updatePausePlayUI();
-      switchYtPane('nowplaying');
-    } else {
-      // Auto-resume from same position
-      playYtVideo(savedState.id, savedState.title, savedState.ch, Math.max(0, Math.floor(elapsed)));
-    }
+    updateNowPlayingView(savedState.id, savedState.title, savedState.ch);
+    ytIsPaused = true;
+    updatePausePlayUI();
+    switchYtPane('nowplaying');
   }
 
   // Live cross-tab sync: when another tab plays something new

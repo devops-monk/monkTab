@@ -42,6 +42,7 @@
     "https://hacker-news.firebaseio.com/*",
     "https://dev.to/*",
     "https://www.reddit.com/*",
-    "https://oauth.reddit.com/*"
+    "https://oauth.reddit.com/*",
+    "https://ipapi.co/*"
   ]
 }

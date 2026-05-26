@@ -109,7 +109,7 @@ export async function fetchWeather(locationOverride = ''): Promise<WeatherCache 
       return w;
     }
 
-    // ── Path 2: device GPS (ignores VPN — expected behaviour) ─────────────────
+    // ── Path 2: device GPS, then IP-based fallback ────────────────────────────
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -129,8 +129,22 @@ export async function fetchWeather(locationOverride = ''): Promise<WeatherCache 
             resolve(w);
           } catch { resolve(cached ?? null); }
         },
-        () => resolve(cached ?? null),
-        { timeout: 5000 },
+        // GPS denied or timed out — fall back to IP geolocation
+        async () => {
+          try {
+            const r = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(6000) });
+            const d = await r.json() as { latitude?: number; longitude?: number; city?: string; country_name?: string };
+            if (d.latitude && d.longitude) {
+              const city = [d.city, d.country_name].filter(Boolean).join(', ') || 'Your location';
+              const w = await fetchWeatherForCoords(d.latitude, d.longitude, city);
+              await saveWeatherCache(w);
+              resolve(w);
+              return;
+            }
+          } catch { /* IP lookup failed */ }
+          resolve(cached ?? null);
+        },
+        { timeout: 6000 },
       );
     });
   } catch { return cached ?? null; }
