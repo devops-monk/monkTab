@@ -2122,13 +2122,15 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   // Seek helpers using YouTube iframe postMessage API
   function ytSeekBy(deltaSec: number) {
     if (!activeYtIframe || !activeYtId) return;
+    // Guard: iframe not yet loaded (e.g. restored paused state) — origin mismatch would occur
+    if (!activeYtIframe.src.includes('youtube-nocookie.com')) return;
     const current = ytIsPaused
       ? 0  // approximate; we don't track pausedPosition here cleanly
       : Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
     const newPos = Math.max(0, current + deltaSec);
     activeYtIframe.contentWindow?.postMessage(
       JSON.stringify({ event: 'command', func: 'seekTo', args: [newPos, true] }),
-      'https://www.youtube-nocookie.com'
+      '*'
     );
     if (!ytIsPaused) {
       ytPlayStartedAt = Date.now() - newPos * 1000;
@@ -2223,6 +2225,11 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   // Now Playing controls
   ytNpPausePlayBtn?.addEventListener('click', () => {
     if (!activeYtIframe) return;
+    // If paused and iframe not loaded (restored from saved state), start fresh playback
+    if (ytIsPaused && activeYtId && !activeYtIframe.src.includes('youtube-nocookie.com')) {
+      playYtVideo(activeYtId, activeYtTitle, activeYtCh);
+      return;
+    }
     const cmd = ytIsPaused ? 'playVideo' : 'pauseVideo';
     activeYtIframe.contentWindow?.postMessage(`{"event":"command","func":"${cmd}","args":""}`, '*');
     // Optimistic UI update — don't wait for YouTube's state-change echo
