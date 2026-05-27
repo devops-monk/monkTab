@@ -30,6 +30,7 @@ export interface Settings {
   blockedSites: string[]; // domains blocked during Focus Mode
   googleClientId: string; // Google OAuth client ID for Calendar
   quoteCategory: 'motivation' | 'stoic' | 'tech' | 'random';
+  tempUnit: 'celsius' | 'fahrenheit';
 }
 
 export interface TabSession {
@@ -212,6 +213,7 @@ const DEFAULTS: Settings = {
   blockedSites: [],
   googleClientId: '',
   quoteCategory: 'motivation',
+  tempUnit: 'celsius',
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -448,4 +450,18 @@ export async function getNotesList(): Promise<Note[]> {
 
 export async function saveNotesList(notes: Note[]): Promise<void> {
   await chrome.storage.local.set({ mt_notes_v2: notes });
+}
+
+// ─── AI prompt history ────────────────────────────────────────────────────────
+
+export async function getAiHistory(): Promise<string[]> {
+  const r = await chrome.storage.local.get('mt_ai_history');
+  return (r['mt_ai_history'] as string[]) ?? [];
+}
+
+export async function addAiHistory(prompt: string): Promise<void> {
+  let history = await getAiHistory();
+  history = history.filter(h => h !== prompt);
+  history.unshift(prompt);
+  await chrome.storage.local.set({ mt_ai_history: history.slice(0, 20) });
 }

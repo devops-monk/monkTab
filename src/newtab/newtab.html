@@ -76,6 +76,7 @@
         <div class="wc-header">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5.25-8 13-8 13S4 15.25 4 10a8 8 0 0 1 8-8z"/></svg>
           <span id="wc-city">—</span>
+          <button id="btn-temp-unit" class="wc-unit-btn">°C</button>
         </div>
 
         <!-- Main: icon + temp + details -->
@@ -169,6 +170,9 @@
         </div>
         <div id="pomo-timer" class="pomo-timer">25:00</div>
         <div id="pomo-task" class="pomo-task"></div>
+        <select id="pomo-task-select" class="pomo-task-select">
+          <option value="">— Pick a task to focus on —</option>
+        </select>
         <div class="pomo-controls">
           <button id="pomo-start" class="pomo-btn">Start</button>
           <button id="pomo-reset" class="pomo-btn pomo-btn-ghost">Reset</button>
@@ -302,6 +306,12 @@
       </div>
     </div>
 
+    <!-- Search bar -->
+    <div class="links-search-wrap">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="links-search" type="text" class="links-search-input" placeholder="Search links…" autocomplete="off" spellcheck="false" />
+    </div>
+
     <!-- Links list -->
     <ul id="links-list" class="links-list"></ul>
 
@@ -333,6 +343,9 @@
         <span>Notes</span>
       </div>
       <div class="notes-header-right">
+        <button id="btn-notes-preview" class="notes-icon-btn" title="Toggle preview (Ctrl+Shift+P)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
         <button id="btn-notes-new" class="notes-icon-btn" title="New note">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -376,8 +389,9 @@
       <button class="notes-fmt-btn" data-fmt="h1" title="Heading">H</button>
     </div>
 
-    <!-- Textarea -->
+    <!-- Textarea / Preview -->
     <textarea id="notes-textarea" class="notes-textarea" placeholder="Start writing…&#10;&#10;Tip: Select text and use the toolbar above to format." spellcheck="true"></textarea>
+    <div id="notes-preview" class="notes-preview hidden"></div>
 
     <!-- Footer -->
     <div class="notes-footer">
@@ -559,6 +573,11 @@
         </button>
       </div>
       <button id="btn-ai-submit" class="save-btn">Ask →</button>
+      <!-- Recent prompts -->
+      <div id="ai-history-wrap" class="ai-history-wrap hidden">
+        <div class="ai-history-label">Recent</div>
+        <div id="ai-history-list" class="ai-history-list"></div>
+      </div>
     </div>
   </div>
 

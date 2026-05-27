@@ -5,7 +5,7 @@ import {
   getYtPlayState, saveYtPlayState, clearYtPlayState, getYtRecent, addYtRecent,
   getHabits, saveHabits, getTodayHabitLog, saveHabitLog, getHabitStreak,
   getJournalEntries, saveJournalEntry,
-  getTabSessions, saveTabSessions, getNotesList, saveNotesList,
+  getTabSessions, saveTabSessions, getNotesList, saveNotesList, getAiHistory, addAiHistory,
   todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
   type CustomYtVideo, type YtPlayState, type WatchItem, type Habit, type JournalEntry,
   type TabSession, type Note,
@@ -86,27 +86,19 @@ function initQuoteRefresh(category = 'motivation') {
 
 // ─── Weather ──────────────────────────────────────────────────────────────────
 
-async function loadWeather(locationOverride = '') {
-  const w = await fetchWeather(locationOverride);
-  if (!w) return;
+let weatherCache: Awaited<ReturnType<typeof fetchWeather>> | null = null;
+let currentTempUnit: 'celsius' | 'fahrenheit' = 'celsius';
 
-  // Topbar badge
-  const widget = document.getElementById('weather-widget') as HTMLElement;
-  (document.getElementById('weather-icon') as HTMLElement).textContent = w.icon;
-  (document.getElementById('weather-temp') as HTMLElement).textContent = `${w.temp}°`;
-  (document.getElementById('weather-city') as HTMLElement).textContent = w.city;
-  widget.classList.remove('hidden');
+function toF(c: number) { return Math.round(c * 9 / 5 + 32); }
+function displayTemp(c: number, unit: typeof currentTempUnit) { return unit === 'fahrenheit' ? toF(c) : c; }
+function unitLabel(unit: typeof currentTempUnit) { return unit === 'fahrenheit' ? '°F' : '°C'; }
 
-  // Expanded card fields
-  (document.getElementById('wc-city') as HTMLElement).textContent = w.city;
-  (document.getElementById('wc-condition') as HTMLElement).textContent = w.condition;
-  (document.getElementById('wc-icon') as HTMLElement).textContent = w.icon;
-  (document.getElementById('wc-temp') as HTMLElement).textContent = String(w.temp);
-  (document.getElementById('wc-feels') as HTMLElement).textContent = `${w.feelsLike ?? w.temp}°C`;
-  (document.getElementById('wc-wind') as HTMLElement).textContent = `${w.windSpeed ?? '--'} km/h`;
-  (document.getElementById('wc-rain') as HTMLElement).textContent = `${w.precipitation ?? 0} mm`;
-
-  // 7-day forecast
+function applyWeatherUnit(w: NonNullable<typeof weatherCache>, unit: typeof currentTempUnit) {
+  const ul = unitLabel(unit);
+  (document.getElementById('weather-temp') as HTMLElement).textContent = `${displayTemp(w.temp, unit)}°`;
+  (document.getElementById('wc-temp') as HTMLElement).textContent = String(displayTemp(w.temp, unit));
+  (document.getElementById('wc-feels') as HTMLElement).textContent = `${displayTemp(w.feelsLike ?? w.temp, unit)}${ul}`;
+  (document.getElementById('btn-temp-unit') as HTMLButtonElement).textContent = ul;
   const forecastEl = document.getElementById('wc-forecast') as HTMLElement;
   forecastEl.innerHTML = '';
   (w.forecast ?? []).forEach(day => {
@@ -115,10 +107,39 @@ async function loadWeather(locationOverride = '') {
     col.innerHTML = `
       <span class="wc-fc-label">${day.day}</span>
       <span class="wc-fc-icon">${day.icon}</span>
-      <span class="wc-fc-hi">${day.hi}°</span>
-      <span class="wc-fc-lo">${day.lo}°</span>
+      <span class="wc-fc-hi">${displayTemp(day.hi, unit)}°</span>
+      <span class="wc-fc-lo">${displayTemp(day.lo, unit)}°</span>
     `;
     forecastEl.appendChild(col);
+  });
+}
+
+async function loadWeather(locationOverride = '', tempUnit: 'celsius' | 'fahrenheit' = 'celsius') {
+  currentTempUnit = tempUnit;
+  const w = await fetchWeather(locationOverride);
+  if (!w) return;
+  weatherCache = w;
+
+  // Topbar badge
+  const widget = document.getElementById('weather-widget') as HTMLElement;
+  (document.getElementById('weather-icon') as HTMLElement).textContent = w.icon;
+  widget.classList.remove('hidden');
+
+  // Expanded card static fields
+  (document.getElementById('wc-city') as HTMLElement).textContent = w.city;
+  (document.getElementById('wc-condition') as HTMLElement).textContent = w.condition;
+  (document.getElementById('wc-icon') as HTMLElement).textContent = w.icon;
+  (document.getElementById('wc-wind') as HTMLElement).textContent = `${w.windSpeed ?? '--'} km/h`;
+  (document.getElementById('wc-rain') as HTMLElement).textContent = `${w.precipitation ?? 0} mm`;
+
+  applyWeatherUnit(w, tempUnit);
+
+  // Unit toggle
+  document.getElementById('btn-temp-unit')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    currentTempUnit = currentTempUnit === 'celsius' ? 'fahrenheit' : 'celsius';
+    if (weatherCache) applyWeatherUnit(weatherCache, currentTempUnit);
+    await saveSettings({ tempUnit: currentTempUnit });
   });
 
   // Toggle expanded card on click
@@ -470,6 +491,7 @@ async function initTodos() {
 let links: QuickLink[] = [];
 let folders: QuickLinkFolder[] = [];
 const collapsedFolders = new Set<string>();
+let linksSearchQuery = '';
 
 function faviconUrl(url: string): string {
   try { return `https://www.google.com/s2/favicons?domain=${new URL(url).origin}&sz=32`; }
@@ -498,6 +520,21 @@ function buildLinkItem(link: QuickLink): HTMLLIElement {
 function renderLinks() {
   const list = document.getElementById('links-list') as HTMLUListElement;
   list.innerHTML = '';
+
+  const q = linksSearchQuery.toLowerCase().trim();
+  const matchesSearch = (l: QuickLink) =>
+    !q || l.label.toLowerCase().includes(q) || l.url.toLowerCase().includes(q);
+
+  if (q) {
+    // In search mode: flat list of all matching links, ignore folder structure
+    const matches = links.filter(matchesSearch);
+    if (matches.length === 0) {
+      list.innerHTML = '<li class="todo-empty">No links match</li>';
+    } else {
+      matches.forEach(link => list.appendChild(buildLinkItem(link)));
+    }
+    return;
+  }
 
   // Ungrouped links first
   const ungrouped = links.filter(l => !l.folderId);
@@ -576,6 +613,12 @@ async function initLinks() {
   const cancelBtn = document.getElementById('btn-link-form-cancel') as HTMLButtonElement;
 
   syncFolderSelect();
+
+  // Search
+  document.getElementById('links-search')?.addEventListener('input', (e) => {
+    linksSearchQuery = (e.target as HTMLInputElement).value;
+    renderLinks();
+  });
 
   // Toggle add form
   function showAddForm() { form.classList.remove('hidden'); addToggleBtn.classList.add('hidden'); labelInput.focus(); }
@@ -1462,6 +1505,42 @@ function initNews() {
 
 // ─── Notes (multi-note) ───────────────────────────────────────────────────────
 
+function renderMarkdown(md: string): string {
+  return md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // headings
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    // hr
+    .replace(/^---$/gm, '<hr>')
+    // bold / italic / code
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    // links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    // task list items before regular bullets
+    .replace(/^- \[x\] (.+)$/gm, '<li class="md-task done"><span class="md-cb">✓</span> $1</li>')
+    .replace(/^- \[ \] (.+)$/gm, '<li class="md-task"><span class="md-cb">○</span> $1</li>')
+    // unordered list
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    // wrap consecutive <li> in <ul>
+    .replace(/(<li>[\s\S]*?<\/li>)(\n(?!<li))/g, '$1</ul>\n')
+    .replace(/(<li class="md-task[\s\S]*?<\/li>)(\n(?!<li))/g, '$1</ul>\n')
+    .replace(/(?<!<\/ul>\n|<ul>)(<li)/g, '<ul>$1')
+    // paragraphs: blank line separated blocks not already tagged
+    .split(/\n\n+/)
+    .map(block => {
+      const trimmed = block.trim();
+      if (!trimmed) return '';
+      if (/^<(h[1-6]|ul|ol|li|hr|blockquote)/.test(trimmed)) return trimmed;
+      return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+    })
+    .join('\n');
+}
+
 async function initNotes() {
   const panel       = document.getElementById('notes-panel')     as HTMLElement;
   const textarea    = document.getElementById('notes-textarea')  as HTMLTextAreaElement;
@@ -1624,6 +1703,23 @@ async function initNotes() {
     URL.revokeObjectURL(url);
   });
 
+  // ── Preview toggle ──────────────────────────────────────────────────────────
+  const previewEl = document.getElementById('notes-preview') as HTMLElement;
+  let previewActive = false;
+  document.getElementById('btn-notes-preview')?.addEventListener('click', () => {
+    previewActive = !previewActive;
+    document.getElementById('btn-notes-preview')?.classList.toggle('active', previewActive);
+    if (previewActive) {
+      previewEl.innerHTML = renderMarkdown(textarea.value);
+      previewEl.classList.remove('hidden');
+      textarea.classList.add('hidden');
+    } else {
+      previewEl.classList.add('hidden');
+      textarea.classList.remove('hidden');
+      textarea.focus();
+    }
+  });
+
   // ── Open / close ────────────────────────────────────────────────────────────
   document.getElementById('btn-notes-toggle')?.addEventListener('click', () => {
     panel.classList.remove('hidden');
@@ -1739,10 +1835,28 @@ const AI_URLS: Record<string, string> = {
 function initAI(defaultProvider: string) {
   const modal = document.getElementById('ai-modal') as HTMLElement;
   const textarea = document.getElementById('ai-prompt') as HTMLTextAreaElement;
+  const historyWrap = document.getElementById('ai-history-wrap') as HTMLElement;
+  const historyList = document.getElementById('ai-history-list') as HTMLElement;
   let provider = defaultProvider;
 
-  document.getElementById('btn-ai-toggle')?.addEventListener('click', () => {
+  async function showHistory() {
+    const history = await getAiHistory();
+    if (!history.length) { historyWrap?.classList.add('hidden'); return; }
+    historyWrap?.classList.remove('hidden');
+    historyList.innerHTML = '';
+    history.slice(0, 8).forEach(prompt => {
+      const chip = document.createElement('button');
+      chip.className = 'ai-history-chip';
+      chip.textContent = prompt.length > 60 ? prompt.slice(0, 57) + '…' : prompt;
+      chip.title = prompt;
+      chip.addEventListener('click', () => { textarea.value = prompt; textarea.focus(); });
+      historyList.appendChild(chip);
+    });
+  }
+
+  document.getElementById('btn-ai-toggle')?.addEventListener('click', async () => {
     modal.classList.remove('hidden');
+    await showHistory();
     setTimeout(() => textarea.focus(), 50);
   });
   document.getElementById('btn-ai-close')?.addEventListener('click', () => modal.classList.add('hidden'));
@@ -1757,20 +1871,21 @@ function initAI(defaultProvider: string) {
     });
   });
 
-  document.getElementById('btn-ai-submit')?.addEventListener('click', () => {
+  async function submitPrompt() {
     const q = textarea.value.trim();
     if (!q) return;
+    await addAiHistory(q);
     const base = AI_URLS[provider] ?? AI_URLS['claude'];
     window.open(base + encodeURIComponent(q), '_blank');
     modal.classList.add('hidden');
     textarea.value = '';
-  });
+  }
+
+  document.getElementById('btn-ai-submit')?.addEventListener('click', submitPrompt);
 
   // Submit on Ctrl+Enter
   textarea.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      document.getElementById('btn-ai-submit')?.click();
-    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitPrompt();
   });
 }
 
@@ -2801,7 +2916,24 @@ let pomoInterval: ReturnType<typeof setInterval> | null = null;
 let pomoRunning = false;
 
 function updatePomoTask() {
-  const task = todos.find(t => !t.done);
+  const sel = document.getElementById('pomo-task-select') as HTMLSelectElement | null;
+  const activeTodos = todos.filter(t => !t.done);
+
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— No task —</option>';
+    activeTodos.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = t.text;
+      sel.appendChild(opt);
+    });
+    // Restore previous selection if still valid
+    if (prev && activeTodos.find(t => t.id === prev)) sel.value = prev;
+  }
+
+  // Update text label from select or first todo
+  const selectedId = sel?.value;
+  const task = selectedId ? activeTodos.find(t => t.id === selectedId) : activeTodos[0];
   const text = task?.text ?? '';
   (document.getElementById('pomo-task') as HTMLElement).textContent = text;
   if (fmTaskLabelEl) fmTaskLabelEl.textContent = text;
@@ -2904,6 +3036,8 @@ function initPomodoro() {
     panel.classList.toggle('hidden');
     updatePomoTask();
   });
+
+  document.getElementById('pomo-task-select')?.addEventListener('change', () => updatePomoTask());
 
   renderPomo();
 }
@@ -3623,7 +3757,7 @@ async function init() {
   // Async non-blocking
   loadBackground(settings);
   if (settings.showQuote) loadQuote(settings.quoteCategory ?? 'motivation');
-  if (settings.showWeather) void loadWeather(settings.locationOverride ?? '');
+  if (settings.showWeather) void loadWeather(settings.locationOverride ?? '', settings.tempUnit ?? 'celsius');
   if (settings.showGithub) loadGithub(settings.githubUsername, settings.githubToken);
 
   document.getElementById('btn-github-refresh')?.addEventListener('click', () => {
