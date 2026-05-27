@@ -1349,6 +1349,10 @@ function renderNewsSkeleton() {
     </div>`).join('');
 }
 
+function newsFaviconUrl(domain: string): string {
+  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+}
+
 function renderNewsCards(items: NewsItem[]) {
   const feed = document.getElementById('news-feed')!;
   if (!items.length) {
@@ -1363,20 +1367,27 @@ function renderNewsCards(items: NewsItem[]) {
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     const scoreColor = item.score >= 300 ? '#fb923c' : item.score >= 100 ? '#a78bfa' : '#4ade80';
+    const domainClean = item.domain?.replace(/^r\//, '') ?? '';
+    const isReddit = item.domain?.startsWith('r/');
+    const faviconDomain = isReddit ? 'reddit.com' : (domainClean || 'example.com');
     a.innerHTML = `
-      <div class="news-card-title">${item.title}</div>
-      <div class="news-card-meta">
-        <span class="news-score" style="color:${scoreColor};background:${scoreColor}1a">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          ${item.score}
-        </span>
-        ${item.domain ? `<span class="news-sep">·</span><span class="news-domain">${item.domain}</span>` : ''}
-        <span class="news-sep">·</span>
-        <span class="news-time">${newsTimeAgo(item.time)}</span>
-        ${item.comments ? `<span class="news-comments">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          ${item.comments}
-        </span>` : ''}
+      <div class="news-card-body">
+        <img class="news-favicon" src="${newsFaviconUrl(faviconDomain)}" width="14" height="14" alt="" loading="lazy" onerror="this.style.display='none'">
+        <div class="news-card-right">
+          <div class="news-card-title">${item.title}</div>
+          <div class="news-card-meta">
+            ${item.score ? `<span class="news-score" style="color:${scoreColor};background:${scoreColor}1a">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              ${item.score}
+            </span><span class="news-sep">·</span>` : ''}
+            ${item.domain ? `<span class="news-domain">${item.domain}</span><span class="news-sep">·</span>` : ''}
+            <span class="news-time">${newsTimeAgo(item.time)}</span>
+            ${item.comments ? `<span class="news-comments">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              ${item.comments}
+            </span>` : ''}
+          </div>
+        </div>
       </div>`;
     feed.appendChild(a);
   });
