@@ -710,7 +710,7 @@ interface StockQuote {
   low: number;
 }
 
-const MARKET_CACHE_TTL = 5 * 60 * 1000; // 5 min
+const MARKET_CACHE_TTL = 60 * 1000; // 60 s — Yahoo Finance is free so we can refresh often
 let activeMarketTab = 'overview';
 
 function fmtPrice(n: number): string {
@@ -769,22 +769,39 @@ async function fetchFearGreed(): Promise<{ value: number; classification: string
   return { value: Number(entry?.value ?? 50), classification: entry?.value_classification ?? 'Neutral' };
 }
 
-async function fetchFinnhubQuote(symbol: string, key: string): Promise<StockQuote | null> {
+async function fetchYahooQuote(symbol: string): Promise<{ quote: StockQuote; candles: number[] } | null> {
   try {
-    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`, { signal: AbortSignal.timeout(6000) });
+    const r = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo`,
+      { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0' } },
+    );
     const d = await r.json();
-    if (!d || d.c === 0) return null;
-    return { symbol, price: d.c, change: d.d, changePct: d.dp, high: d.h, low: d.l };
+    const result = d?.chart?.result?.[0];
+    if (!result) return null;
+    const meta = result.meta;
+    const price: number = meta.regularMarketPrice ?? 0;
+    const prev: number = meta.chartPreviousClose ?? meta.previousClose ?? price;
+    const change = price - prev;
+    const changePct = prev ? (change / prev) * 100 : 0;
+    const closes: number[] = result.indicators?.quote?.[0]?.close?.filter((v: number | null) => v != null) ?? [];
+    return {
+      quote: { symbol, price, change, changePct, high: meta.regularMarketDayHigh ?? price, low: meta.regularMarketDayLow ?? price },
+      candles: closes,
+    };
   } catch { return null; }
 }
 
-async function fetchFinnhubCandles(symbol: string, key: string): Promise<number[]> {
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - 30 * 86400;
+async function searchYahooStocks(query: string): Promise<{ symbol: string; name: string }[]> {
   try {
-    const r = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${key}`, { signal: AbortSignal.timeout(6000) });
+    const r = await fetch(
+      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=6&newsCount=0`,
+      { signal: AbortSignal.timeout(5000), headers: { 'User-Agent': 'Mozilla/5.0' } },
+    );
     const d = await r.json();
-    return d?.s === 'ok' ? (d.c as number[]) : [];
+    return (d?.quotes ?? [])
+      .filter((q: any) => q.typeDisp === 'equity' || q.typeDisp === 'ETF')
+      .slice(0, 5)
+      .map((q: any) => ({ symbol: q.symbol as string, name: (q.shortname || q.longname || q.symbol) as string }));
   } catch { return []; }
 }
 
@@ -947,7 +964,7 @@ async function loadMarketWatchlist(settings: Settings, force = false) {
     if (entry && Date.now() - entry.cachedAt < MARKET_CACHE_TTL) {
       renderWatchlistSection('Crypto', entry.cryptoRows.map(buildCryptoRow));
       if (entry.stockRows.length) renderWatchlistSection('Stocks', entry.stockRows.map(r => buildStockRow(r.q, r.c)));
-      else if (!settings.finnhubKey) noKeyEl.classList.remove('hidden');
+      else if (!settings.marketWatchlistStocks.length) noKeyEl.classList.remove('hidden');
       return;
     }
   }
@@ -962,21 +979,13 @@ async function loadMarketWatchlist(settings: Settings, force = false) {
     body.innerHTML = '';
     renderWatchlistSection('Crypto', cryptoCoins.map(buildCryptoRow));
 
-    if (settings.finnhubKey && stockSymbols.length) {
-      const stockResults = await Promise.all(
-        stockSymbols.map(async sym => {
-          const [q, c] = await Promise.all([
-            fetchFinnhubQuote(sym, settings.finnhubKey),
-            fetchFinnhubCandles(sym, settings.finnhubKey),
-          ]);
-          return q ? { q, c } : null;
-        })
-      );
-      const valid = stockResults.filter(Boolean) as { q: StockQuote; c: number[] }[];
-      if (valid.length) renderWatchlistSection('Stocks', valid.map(r => buildStockRow(r.q, r.c)));
-      await chrome.storage.local.set({ [cacheKey]: { cryptoRows: cryptoCoins, stockRows: valid, cachedAt: Date.now() } });
+    if (stockSymbols.length) {
+      const stockResults = await Promise.all(stockSymbols.map(sym => fetchYahooQuote(sym)));
+      const valid = stockResults.filter(Boolean) as { quote: StockQuote; candles: number[] }[];
+      if (valid.length) renderWatchlistSection('Stocks', valid.map(r => buildStockRow(r.quote, r.candles)));
+      await chrome.storage.local.set({ [cacheKey]: { cryptoRows: cryptoCoins, stockRows: valid.map(r => ({ q: r.quote, c: r.candles })), cachedAt: Date.now() } });
     } else {
-      if (!settings.finnhubKey) noKeyEl.classList.remove('hidden');
+      noKeyEl.classList.remove('hidden');
       await chrome.storage.local.set({ [cacheKey]: { cryptoRows: cryptoCoins, stockRows: [], cachedAt: Date.now() } });
     }
     setMarketLastUpdated();
@@ -1003,6 +1012,23 @@ function fireAlert(item: WatchItem, price: number) {
       message: `${item.symbol} is now $${fmtPrice(price)}, ${dir} your target of $${fmtPrice(item.alertPrice)}`,
     });
   } catch { /* notifications may not be available */ }
+  // Play a distinct two-tone chime so the developer hears it immediately
+  try {
+    const ctx = new AudioContext();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+    setTimeout(() => ctx.close(), 1200);
+  } catch { /* AudioContext unavailable */ }
 }
 
 async function renderWatchlistAlerts(settings: Settings) {
@@ -1032,13 +1058,10 @@ async function renderWatchlistAlerts(settings: Settings) {
       coins.forEach(c => { cryptoPrices[c.id] = { price: c.current_price, change24h: c.price_change_percentage_24h, sparkline: c.sparkline_in_7d?.price ?? [] }; });
     })(),
     (async () => {
-      if (!stockItems.length || !settings.finnhubKey) return;
+      if (!stockItems.length) return;
       await Promise.all(stockItems.map(async item => {
-        const [q, candles] = await Promise.all([
-          fetchFinnhubQuote(item.symbol, settings.finnhubKey),
-          fetchFinnhubCandles(item.symbol, settings.finnhubKey),
-        ]);
-        if (q) stockPrices[item.symbol] = { price: q.price, changePct: q.changePct, candles };
+        const result = await fetchYahooQuote(item.symbol);
+        if (result) stockPrices[item.symbol] = { price: result.quote.price, changePct: result.quote.changePct, candles: result.candles };
       }));
     })(),
   ]);
@@ -1052,17 +1075,6 @@ async function renderWatchlistAlerts(settings: Settings) {
 
   holdingsEl.innerHTML = '';
 
-  const hasStocks = watchlist.some(i => i.type === 'stock');
-  if (hasStocks && !settings.finnhubKey) {
-    const banner = document.createElement('div');
-    banner.className = 'watchlist-no-key-banner';
-    banner.innerHTML = `🔑 Stock prices need a <strong>Finnhub API key</strong>. Add it in <a class="banner-settings-link" href="#">Settings → Markets</a>. It's free.`;
-    banner.querySelector<HTMLAnchorElement>('.banner-settings-link')?.addEventListener('click', e => {
-      e.preventDefault();
-      document.getElementById('settings-btn')?.click();
-    });
-    holdingsEl.appendChild(banner);
-  }
 
   watchlist.forEach(item => {
     const isCrypto = item.type === 'crypto';
@@ -1085,7 +1097,7 @@ async function renderWatchlistAlerts(settings: Settings) {
         <span class="portfolio-symbol">${item.symbol}</span>
         <span class="portfolio-type-badge ${item.type}">${item.type}</span>
       </div>
-      <span class="market-row-price" style="flex:1;text-align:right">${price ? '$' + fmtPrice(price) : (!isCrypto && !settings.finnhubKey ? '<span class="watch-no-key-hint" title="Add your Finnhub API key in Settings → Markets">🔑 Key needed</span>' : '—')}</span>
+      <span class="market-row-price" style="flex:1;text-align:right">${price ? '$' + fmtPrice(price) : '—'}</span>
       <span class="market-row-change ${changeClass(changePct)}" style="min-width:72px">${price ? changeArrow(changePct) + ' ' + Math.abs(changePct).toFixed(2) + '%' : ''}</span>
       <div class="market-row-sparkline">${spark}</div>
       ${hasAlert ? `<span class="watch-alert-badge${alertFired ? ' triggered' : ''}" title="Alert: ${item.alertDirection} $${item.alertPrice}">
@@ -1188,6 +1200,14 @@ function initMarkets(settings: Settings) {
   });
 
   initWatchlistForm(settings);
+
+  // Auto-refresh every 60 s when panel is open (check alerts each cycle)
+  setInterval(() => {
+    if (!panel.classList.contains('open')) return;
+    if (activeMarketTab === 'overview') loadMarketOverview(true);
+    else if (activeMarketTab === 'watchlist') loadMarketWatchlist(settings, true);
+    else renderWatchlistAlerts(settings);
+  }, 60 * 1000);
 }
 
 // ─── News ─────────────────────────────────────────────────────────────────────
@@ -3514,6 +3534,74 @@ function initSegmented(groupId: string, selectId: string) {
   });
 }
 
+let stockSearchSymbols: string[] = [];
+
+function initStockSearchSettings(settings: Settings) {
+  stockSearchSymbols = [...(settings.marketWatchlistStocks ?? [])];
+  const searchInput = document.getElementById('set-stock-search') as HTMLInputElement;
+  const dropdown = document.getElementById('stock-search-dropdown') as HTMLElement;
+  const chipsEl = document.getElementById('stock-chips') as HTMLElement;
+
+  function renderChips() {
+    chipsEl.innerHTML = '';
+    stockSearchSymbols.forEach(sym => {
+      const chip = document.createElement('span');
+      chip.className = 'stock-chip';
+      chip.innerHTML = `${sym} <button class="stock-chip-del" data-sym="${sym}">✕</button>`;
+      chip.querySelector('button')?.addEventListener('click', () => {
+        stockSearchSymbols = stockSearchSymbols.filter(s => s !== sym);
+        renderChips();
+      });
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  function addSymbol(sym: string) {
+    const upper = sym.toUpperCase();
+    if (!stockSearchSymbols.includes(upper)) stockSearchSymbols.push(upper);
+    renderChips();
+    searchInput.value = '';
+    dropdown.innerHTML = ''; dropdown.classList.add('hidden');
+  }
+
+  let searchTimer: ReturnType<typeof setTimeout>;
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    if (!q) { dropdown.classList.add('hidden'); return; }
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      const results = await searchYahooStocks(q);
+      dropdown.innerHTML = '';
+      if (!results.length) { dropdown.classList.add('hidden'); return; }
+      results.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'stock-dd-item';
+        item.innerHTML = `<strong>${r.symbol}</strong><span class="stock-dd-name">${r.name}</span>`;
+        item.addEventListener('click', () => addSymbol(r.symbol));
+        dropdown.appendChild(item);
+      });
+      dropdown.classList.remove('hidden');
+    }, 280);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = searchInput.value.trim();
+      if (q) addSymbol(q);
+    }
+    if (e.key === 'Escape') { dropdown.classList.add('hidden'); }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target as Node) && !dropdown.contains(e.target as Node)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  renderChips();
+}
+
 function initSettingsPanel(settings: Settings) {
   const overlay = document.getElementById('settings-panel') as HTMLElement;
 
@@ -3592,8 +3680,7 @@ function initSettingsPanel(settings: Settings) {
   (document.getElementById('set-unsplash') as HTMLInputElement).value = settings.unsplashKey;
   (document.getElementById('set-gh-user') as HTMLInputElement).value = settings.githubUsername;
   (document.getElementById('set-gh-token') as HTMLInputElement).value = settings.githubToken;
-  (document.getElementById('set-finnhub-key') as HTMLInputElement).value = settings.finnhubKey ?? '';
-  (document.getElementById('set-market-stocks') as HTMLInputElement).value = (settings.marketWatchlistStocks ?? []).join(', ');
+  initStockSearchSettings(settings);
   (document.getElementById('set-market-crypto') as HTMLInputElement).value = (settings.marketWatchlistCrypto ?? []).join(', ');
   aiSelect.value = settings.aiProvider;
 
@@ -3641,8 +3728,7 @@ function initSettingsPanel(settings: Settings) {
       unsplashKey: (document.getElementById('set-unsplash') as HTMLInputElement).value.trim(),
       githubUsername: (document.getElementById('set-gh-user') as HTMLInputElement).value.trim(),
       githubToken: (document.getElementById('set-gh-token') as HTMLInputElement).value.trim(),
-      finnhubKey: (document.getElementById('set-finnhub-key') as HTMLInputElement).value.trim(),
-      marketWatchlistStocks: (document.getElementById('set-market-stocks') as HTMLInputElement).value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
+      marketWatchlistStocks: stockSearchSymbols,
       marketWatchlistCrypto: (document.getElementById('set-market-crypto') as HTMLInputElement).value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
       aiProvider: aiSelect.value as 'claude' | 'chatgpt' | 'gemini',
       worldClocks: clonedClocks.filter(c => c.label && c.timezone),

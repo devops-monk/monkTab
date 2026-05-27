@@ -1066,21 +1066,15 @@
           <p class="sc-desc">Track crypto prices and stock watchlists</p>
 
           <div class="set-card">
-            <div class="set-row">
-              <div class="set-row-info">
-                <span class="set-row-title">Finnhub API key</span>
-                <span class="set-row-desc">Required for real-time stock quotes — get a free key at <strong>finnhub.io</strong></span>
-              </div>
-            </div>
-            <input id="set-finnhub-key" class="set-input set-input-full" type="password" placeholder="pk_live_…" autocomplete="off" />
-          </div>
-
-          <div class="set-card">
             <div class="set-row-info" style="padding:0 0 10px">
               <span class="set-row-title">Stock watchlist</span>
-              <span class="set-row-desc">Comma-separated ticker symbols (e.g. AAPL, NVDA, TSLA)</span>
+              <span class="set-row-desc">Type a company name or ticker to search, then press Enter or click to add</span>
             </div>
-            <input id="set-market-stocks" class="set-input set-input-full" type="text" placeholder="AAPL, NVDA, GOOGL, MSFT, TSLA" autocomplete="off" />
+            <div class="stock-search-wrap">
+              <input id="set-stock-search" class="set-input" type="text" placeholder="Search company or ticker…" autocomplete="off" />
+              <div id="stock-search-dropdown" class="stock-search-dropdown hidden"></div>
+            </div>
+            <div id="stock-chips" class="stock-chips"></div>
           </div>
 
           <div class="set-card">
@@ -1303,8 +1297,7 @@
     <div id="market-pane-watchlist" class="market-pane hidden">
       <div id="market-watchlist-body" class="market-watchlist-body"></div>
       <p id="market-no-key" class="market-no-key hidden">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Add your <strong>Finnhub API key</strong> in Settings → Markets to unlock stock quotes.
+        Add stocks in Settings → Markets to see stock prices.
       </p>
     </div>
 

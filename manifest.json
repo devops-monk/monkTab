@@ -45,6 +45,8 @@
     "https://www.reddit.com/*",
     "https://oauth.reddit.com/*",
     "https://ipapi.co/*",
-    "https://news.google.com/*"
+    "https://news.google.com/*",
+    "https://query1.finance.yahoo.com/*",
+    "https://query2.finance.yahoo.com/*"
   ]
 }
