@@ -39,6 +39,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         Journal
       </button>
+      <button class="icon-btn" id="btn-sessions-toggle" title="Tab Sessions (Alt+S)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="14" y2="12"/></svg>
+        Sessions
+      </button>
     </div>
 
     <form id="search-form" class="search-form" autocomplete="off">
@@ -329,7 +333,13 @@
         <span>Notes</span>
       </div>
       <div class="notes-header-right">
-        <button id="btn-notes-clear" class="notes-icon-btn" title="Clear all">
+        <button id="btn-notes-new" class="notes-icon-btn" title="New note">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button id="btn-notes-export" class="notes-icon-btn" title="Export note">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <button id="btn-notes-delete" class="notes-icon-btn" title="Delete note">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
         </button>
         <button id="btn-notes-copy" class="notes-icon-btn" title="Copy all">
@@ -340,6 +350,12 @@
         </button>
       </div>
     </div>
+
+    <!-- Notes tab strip -->
+    <div id="notes-tabs" class="notes-tabs"></div>
+
+    <!-- Note title -->
+    <input id="notes-title-input" class="notes-title-input" type="text" placeholder="Untitled" maxlength="60" spellcheck="false" autocomplete="off" />
 
     <!-- Format toolbar -->
     <div class="notes-toolbar">
@@ -592,6 +608,19 @@
           <div class="set-card">
             <div class="set-row">
               <div class="set-row-info">
+                <span class="set-row-title">Export data</span>
+                <span class="set-row-desc">Download all your MonkTab data as JSON backup</span>
+              </div>
+              <button id="btn-export-data" class="set-action-btn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export
+              </button>
+            </div>
+          </div>
+
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-row-info">
                 <span class="set-row-title">Theme</span>
                 <span class="set-row-desc">Choose light, dark, or follow system</span>
               </div>
@@ -656,6 +685,24 @@
                 <span class="set-row-desc">Inspirational quote below your focus</span>
               </div>
               <label class="sw"><input type="checkbox" id="set-quote" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
+            </div>
+            <div class="set-row">
+              <div class="set-row-info">
+                <span class="set-row-title">Quote category</span>
+                <span class="set-row-desc">Style of daily quote</span>
+              </div>
+              <div class="set-seg" id="seg-quote-cat">
+                <button class="seg-btn active" data-val="motivation">Motivation</button>
+                <button class="seg-btn" data-val="stoic">Stoic</button>
+                <button class="seg-btn" data-val="tech">Tech</button>
+                <button class="seg-btn" data-val="random">Random</button>
+              </div>
+              <select id="set-quote-cat" class="set-hidden-select">
+                <option value="motivation">Motivation</option>
+                <option value="stoic">Stoic</option>
+                <option value="tech">Tech</option>
+                <option value="random">Random</option>
+              </select>
             </div>
             <div class="set-divider"></div>
             <div class="set-row">
@@ -1336,6 +1383,10 @@
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
           Cloud
         </button>
+        <button class="news-tab" data-ntab="google">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="none"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="none"/><path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z" fill="none"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="none"/></svg>
+          Google
+        </button>
       </div>
     </div>
 
@@ -1391,6 +1442,50 @@
   <div id="blocked-banner" class="blocked-banner hidden">
     <span>🚫 This site is blocked during Focus Mode</span>
     <button id="btn-blocked-back" class="blocked-back-btn">Go back</button>
+  </div>
+
+  <!-- Tab Sessions panel -->
+  <aside id="sessions-panel" class="sessions-panel hidden">
+    <div class="sessions-header">
+      <span class="sessions-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Tab Sessions
+      </span>
+      <div class="sessions-header-right">
+        <button id="btn-sessions-save" class="sessions-action-btn" title="Save current tabs as session">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save
+        </button>
+        <button id="btn-sessions-close" class="icon-btn-sm" title="Close">✕</button>
+      </div>
+    </div>
+    <p id="sessions-empty" class="sessions-empty hidden">No saved sessions yet.<br>Click Save to capture your open tabs.</p>
+    <ul id="sessions-list" class="sessions-list"></ul>
+  </aside>
+
+  <!-- Keyboard shortcuts modal -->
+  <div id="shortcuts-modal" class="shortcuts-modal hidden">
+    <div class="shortcuts-card">
+      <div class="shortcuts-header">
+        <span class="shortcuts-title">Keyboard Shortcuts</span>
+        <button id="btn-shortcuts-close" class="notes-icon-btn notes-icon-btn--close">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>N</kbd><span class="sc-desc">Notes</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>P</kbd><span class="sc-desc">Pomodoro</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>H</kbd><span class="sc-desc">Habits</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>J</kbd><span class="sc-desc">Journal</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>L</kbd><span class="sc-desc">Links</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>M</kbd><span class="sc-desc">Music / Sounds</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>S</kbd><span class="sc-desc">Sessions</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>W</kbd><span class="sc-desc">News</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>,</kbd><span class="sc-desc">Settings</span></div>
+        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>?</kbd><span class="sc-desc">This cheatsheet</span></div>
+        <div class="shortcut-row"><kbd>Esc</kbd><span></span><span></span><span class="sc-desc">Close any panel</span></div>
+      </div>
+    </div>
   </div>
 
   <!-- Branding watermark -->

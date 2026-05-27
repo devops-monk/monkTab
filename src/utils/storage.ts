@@ -29,6 +29,22 @@ export interface Settings {
   marketWatchlistStocks: string[];
   blockedSites: string[]; // domains blocked during Focus Mode
   googleClientId: string; // Google OAuth client ID for Calendar
+  quoteCategory: 'motivation' | 'stoic' | 'tech' | 'random';
+}
+
+export interface TabSession {
+  id: string;
+  name: string;
+  savedAt: number;
+  tabs: { title: string; url: string; favicon?: string }[];
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Habit {
@@ -195,6 +211,7 @@ const DEFAULTS: Settings = {
   marketWatchlistStocks: ['AAPL', 'NVDA', 'GOOGL', 'MSFT', 'TSLA'],
   blockedSites: [],
   googleClientId: '',
+  quoteCategory: 'motivation',
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -395,4 +412,40 @@ export async function saveJournalEntry(entry: JournalEntry): Promise<void> {
   if (idx >= 0) entries[idx] = entry; else entries.push(entry);
   const recent = entries.sort((a, b) => a.date.localeCompare(b.date)).slice(-365);
   await chrome.storage.local.set({ mt_journal: recent });
+}
+
+// ─── Tab Sessions ─────────────────────────────────────────────────────────────
+
+export async function getTabSessions(): Promise<TabSession[]> {
+  const r = await chrome.storage.local.get('mt_tab_sessions');
+  return (r['mt_tab_sessions'] as TabSession[]) ?? [];
+}
+
+export async function saveTabSessions(sessions: TabSession[]): Promise<void> {
+  await chrome.storage.local.set({ mt_tab_sessions: sessions });
+}
+
+// ─── Multi-note Notes ─────────────────────────────────────────────────────────
+
+export async function getNotesList(): Promise<Note[]> {
+  const r = await chrome.storage.local.get(['mt_notes_v2', 'mt_notes']);
+  if (r['mt_notes_v2']) return r['mt_notes_v2'] as Note[];
+  // Migrate from single note string
+  const legacy = (r['mt_notes'] as string) ?? '';
+  if (legacy) {
+    const note: Note = {
+      id: 'note_legacy',
+      title: 'My Notes',
+      content: legacy,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await chrome.storage.local.set({ mt_notes_v2: [note] });
+    return [note];
+  }
+  return [];
+}
+
+export async function saveNotesList(notes: Note[]): Promise<void> {
+  await chrome.storage.local.set({ mt_notes_v2: notes });
 }

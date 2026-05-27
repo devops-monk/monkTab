@@ -5,8 +5,10 @@ import {
   getYtPlayState, saveYtPlayState, clearYtPlayState, getYtRecent, addYtRecent,
   getHabits, saveHabits, getTodayHabitLog, saveHabitLog, getHabitStreak,
   getJournalEntries, saveJournalEntry,
+  getTabSessions, saveTabSessions, getNotesList, saveNotesList,
   todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
   type CustomYtVideo, type YtPlayState, type WatchItem, type Habit, type JournalEntry,
+  type TabSession, type Note,
   getWatchlist, saveWatchlist,
 } from '../utils/storage';
 import { fetchWeather } from '../utils/weather';
@@ -70,14 +72,14 @@ function setQuote(quote: string, author: string) {
   }, 180);
 }
 
-async function loadQuote() {
-  const { quote, author } = await getQuote();
+async function loadQuote(category = 'motivation') {
+  const { quote, author } = await getQuote(category);
   setQuote(quote, author);
 }
 
-function initQuoteRefresh() {
+function initQuoteRefresh(category = 'motivation') {
   document.getElementById('btn-quote-refresh')?.addEventListener('click', () => {
-    const { quote, author } = getRandomQuote();
+    const { quote, author } = getRandomQuote(category);
     setQuote(quote, author);
   });
 }
@@ -1313,6 +1315,30 @@ async function fetchCloudNews(): Promise<NewsItem[]> {
   );
 }
 
+async function fetchGoogleNews(): Promise<NewsItem[]> {
+  const RSS_URL = 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en';
+  const res = await fetch(RSS_URL, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error('Google News RSS failed');
+  const text = await res.text();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'application/xml');
+  const items = Array.from(doc.querySelectorAll('item')).slice(0, 25);
+  return items.map((item) => {
+    const title = item.querySelector('title')?.textContent ?? '';
+    const link = item.querySelector('link')?.textContent ?? item.querySelector('guid')?.textContent ?? '';
+    const pubDate = item.querySelector('pubDate')?.textContent ?? '';
+    const source = item.querySelector('source')?.textContent ?? '';
+    return {
+      title: title.replace(/ - [^-]+$/, ''), // strip trailing source from title
+      url: link,
+      score: 0,
+      time: pubDate ? Math.floor(new Date(pubDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      comments: 0,
+      domain: source || 'news.google.com',
+    } as NewsItem;
+  }).filter(i => i.title && i.url);
+}
+
 function renderNewsSkeleton() {
   const feed = document.getElementById('news-feed')!;
   feed.innerHTML = Array.from({ length: 7 }).map(() => `
@@ -1379,6 +1405,7 @@ async function loadNews(tab: string, force = false) {
     else if (tab === 'ai') items = await fetchAINews();
     else if (tab === 'releases') items = await fetchReleasesNews();
     else if (tab === 'security') items = await fetchSecurityNews();
+    else if (tab === 'google') items = await fetchGoogleNews();
     else items = await fetchCloudNews();
     renderNewsCards(items);
     await chrome.storage.local.set({ [cacheKey]: { items, cachedAt: Date.now() } });
@@ -1422,26 +1449,57 @@ function initNews() {
   });
 }
 
-// ─── Notes ────────────────────────────────────────────────────────────────────
+// ─── Notes (multi-note) ───────────────────────────────────────────────────────
 
 async function initNotes() {
-  const panel    = document.getElementById('notes-panel')    as HTMLElement;
-  const textarea = document.getElementById('notes-textarea') as HTMLTextAreaElement;
-  const wordCountEl  = document.getElementById('notes-wordcount')   as HTMLElement;
-  const saveStatusEl = document.getElementById('notes-save-status') as HTMLElement;
-  const saveIconEl   = document.getElementById('notes-save-icon')   as HTMLElement;
+  const panel       = document.getElementById('notes-panel')     as HTMLElement;
+  const textarea    = document.getElementById('notes-textarea')  as HTMLTextAreaElement;
+  const titleInput  = document.getElementById('notes-title-input') as HTMLInputElement;
+  const tabsEl      = document.getElementById('notes-tabs')       as HTMLElement;
+  const wordCountEl = document.getElementById('notes-wordcount')  as HTMLElement;
+  const saveStatusEl= document.getElementById('notes-save-status') as HTMLElement;
+  const saveIconEl  = document.getElementById('notes-save-icon')   as HTMLElement;
 
-  textarea.value = await getNotes();
-  updateWordCount();
+  let notes: Note[] = await getNotesList();
+  if (notes.length === 0) {
+    notes = [{ id: `note_${Date.now()}`, title: 'My Notes', content: '', createdAt: Date.now(), updatedAt: Date.now() }];
+    await saveNotesList(notes);
+  }
+  let activeNoteId = notes[0].id;
 
-  // ── Word count ──────────────────────────────────────────────────────────────
+  function renderTabs() {
+    tabsEl.innerHTML = '';
+    notes.forEach(n => {
+      const btn = document.createElement('button');
+      btn.className = `notes-tab${n.id === activeNoteId ? ' active' : ''}`;
+      btn.textContent = n.title || 'Untitled';
+      btn.title = n.title || 'Untitled';
+      btn.addEventListener('click', () => switchNote(n.id));
+      tabsEl.appendChild(btn);
+    });
+  }
+
+  function loadActiveNote() {
+    const note = notes.find(n => n.id === activeNoteId);
+    if (!note) return;
+    titleInput.value = note.title;
+    textarea.value = note.content;
+    updateWordCount();
+  }
+
+  function switchNote(id: string) {
+    activeNoteId = id;
+    renderTabs();
+    loadActiveNote();
+    setTimeout(() => textarea.focus(), 60);
+  }
+
   function updateWordCount() {
     const text = textarea.value.trim();
     const words = text ? text.split(/\s+/).length : 0;
     wordCountEl.textContent = `${words} word${words !== 1 ? 's' : ''}`;
   }
 
-  // ── Autosave with status indicator ─────────────────────────────────────────
   let saveTimer: ReturnType<typeof setTimeout>;
   function setSaveStatus(state: 'saving' | 'saved') {
     saveStatusEl.className = `notes-save-status ${state}`;
@@ -1454,27 +1512,26 @@ async function initNotes() {
     }
   }
 
+  async function persistCurrentNote() {
+    const idx = notes.findIndex(n => n.id === activeNoteId);
+    if (idx < 0) return;
+    notes[idx].content = textarea.value;
+    notes[idx].title = titleInput.value || 'Untitled';
+    notes[idx].updatedAt = Date.now();
+    await saveNotesList(notes);
+    renderTabs();
+  }
+
   textarea.addEventListener('input', () => {
     updateWordCount();
     setSaveStatus('saving');
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
-      await saveNotes(textarea.value);
-      setSaveStatus('saved');
-    }, 700);
+    saveTimer = setTimeout(async () => { await persistCurrentNote(); setSaveStatus('saved'); }, 700);
   });
 
-  // ── Keyboard shortcuts (Ctrl/Cmd + B/I) ────────────────────────────────────
-  textarea.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); applyFmt('bold'); }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); applyFmt('italic'); }
-    // Tab inserts 2 spaces instead of leaving the textarea
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const s = textarea.selectionStart, en = textarea.selectionEnd;
-      textarea.value = textarea.value.slice(0, s) + '  ' + textarea.value.slice(en);
-      textarea.selectionStart = textarea.selectionEnd = s + 2;
-    }
+  titleInput.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => { await persistCurrentNote(); setSaveStatus('saved'); }, 700);
   });
 
   // ── Format toolbar ──────────────────────────────────────────────────────────
@@ -1483,49 +1540,57 @@ async function initNotes() {
     const selected = textarea.value.slice(s, e);
     const before = textarea.value.slice(0, s);
     const after  = textarea.value.slice(e);
-
     let replacement = selected;
     let cursorOffset = 0;
-
-    if (fmt === 'bold') {
-      replacement = `**${selected || 'bold text'}**`;
-      cursorOffset = selected ? 0 : -2;
-    } else if (fmt === 'italic') {
-      replacement = `_${selected || 'italic text'}_`;
-      cursorOffset = selected ? 0 : -1;
-    } else if (fmt === 'code') {
-      replacement = `\`${selected || 'code'}\``;
-      cursorOffset = selected ? 0 : -1;
-    } else if (fmt === 'ul') {
-      // Prefix each selected line with "- "
-      const lines = (selected || 'List item').split('\n');
-      replacement = lines.map(l => `- ${l}`).join('\n');
-      cursorOffset = 0;
-    } else if (fmt === 'task') {
-      const lines = (selected || 'Task').split('\n');
-      replacement = lines.map(l => `- [ ] ${l}`).join('\n');
-      cursorOffset = 0;
-    } else if (fmt === 'hr') {
-      replacement = `\n---\n`;
-      cursorOffset = 0;
-    } else if (fmt === 'h1') {
-      const lines = (selected || 'Heading').split('\n');
-      replacement = lines.map(l => l.startsWith('# ') ? l.slice(2) : `# ${l}`).join('\n');
-      cursorOffset = 0;
-    }
-
+    if (fmt === 'bold') { replacement = `**${selected || 'bold text'}**`; cursorOffset = selected ? 0 : -2; }
+    else if (fmt === 'italic') { replacement = `_${selected || 'italic text'}_`; cursorOffset = selected ? 0 : -1; }
+    else if (fmt === 'code') { replacement = `\`${selected || 'code'}\``; cursorOffset = selected ? 0 : -1; }
+    else if (fmt === 'ul') { replacement = (selected || 'List item').split('\n').map(l => `- ${l}`).join('\n'); }
+    else if (fmt === 'task') { replacement = (selected || 'Task').split('\n').map(l => `- [ ] ${l}`).join('\n'); }
+    else if (fmt === 'hr') { replacement = `\n---\n`; }
+    else if (fmt === 'h1') { replacement = (selected || 'Heading').split('\n').map(l => l.startsWith('# ') ? l.slice(2) : `# ${l}`).join('\n'); }
     textarea.value = before + replacement + after;
-    const newPos = s + replacement.length + cursorOffset;
-    textarea.selectionStart = textarea.selectionEnd = newPos;
+    textarea.selectionStart = textarea.selectionEnd = s + replacement.length + cursorOffset;
     textarea.focus();
     textarea.dispatchEvent(new Event('input'));
   }
+
+  // ── Keyboard shortcuts inside textarea ─────────────────────────────────────
+  textarea.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); applyFmt('bold'); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') { e.preventDefault(); applyFmt('italic'); }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = textarea.selectionStart, en = textarea.selectionEnd;
+      textarea.value = textarea.value.slice(0, s) + '  ' + textarea.value.slice(en);
+      textarea.selectionStart = textarea.selectionEnd = s + 2;
+    }
+  });
 
   document.querySelectorAll<HTMLButtonElement>('.notes-fmt-btn').forEach(btn => {
     btn.addEventListener('click', () => applyFmt(btn.dataset['fmt']!));
   });
 
-  // ── Copy all ────────────────────────────────────────────────────────────────
+  // ── New note ────────────────────────────────────────────────────────────────
+  document.getElementById('btn-notes-new')?.addEventListener('click', async () => {
+    const note: Note = { id: `note_${Date.now()}`, title: 'Untitled', content: '', createdAt: Date.now(), updatedAt: Date.now() };
+    notes.push(note);
+    await saveNotesList(notes);
+    switchNote(note.id);
+  });
+
+  // ── Delete note ─────────────────────────────────────────────────────────────
+  document.getElementById('btn-notes-delete')?.addEventListener('click', async () => {
+    if (notes.length <= 1) { if (confirm('Clear this note?')) { textarea.value = ''; textarea.dispatchEvent(new Event('input')); } return; }
+    if (!confirm('Delete this note?')) return;
+    notes = notes.filter(n => n.id !== activeNoteId);
+    await saveNotesList(notes);
+    activeNoteId = notes[0].id;
+    renderTabs();
+    loadActiveNote();
+  });
+
+  // ── Copy ────────────────────────────────────────────────────────────────────
   document.getElementById('btn-notes-copy')?.addEventListener('click', async () => {
     if (!textarea.value) return;
     await navigator.clipboard.writeText(textarea.value);
@@ -1535,13 +1600,17 @@ async function initNotes() {
     setTimeout(() => { btn.innerHTML = orig; }, 1500);
   });
 
-  // ── Clear ───────────────────────────────────────────────────────────────────
-  document.getElementById('btn-notes-clear')?.addEventListener('click', () => {
-    if (!textarea.value) return;
-    if (confirm('Clear all notes?')) {
-      textarea.value = '';
-      textarea.dispatchEvent(new Event('input'));
-    }
+  // ── Export ──────────────────────────────────────────────────────────────────
+  document.getElementById('btn-notes-export')?.addEventListener('click', () => {
+    const note = notes.find(n => n.id === activeNoteId);
+    if (!note) return;
+    const blob = new Blob([note.content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(note.title || 'note').replace(/[^a-z0-9]/gi, '_')}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   });
 
   // ── Open / close ────────────────────────────────────────────────────────────
@@ -1551,6 +1620,9 @@ async function initNotes() {
     if (panel.classList.contains('open')) setTimeout(() => textarea.focus(), 280);
   });
   document.getElementById('btn-notes-close')?.addEventListener('click', () => panel.classList.remove('open'));
+
+  renderTabs();
+  loadActiveNote();
 }
 
 // ─── Countdowns ───────────────────────────────────────────────────────────────
@@ -2487,6 +2559,149 @@ async function initJournal() {
   document.getElementById('btn-journal-close')?.addEventListener('click', () => panel.classList.add('hidden'));
 }
 
+// ─── Tab Sessions ──────────────────────────────────────────────────────────────
+
+async function initTabSessions() {
+  const panel = document.getElementById('sessions-panel') as HTMLElement;
+  const list  = document.getElementById('sessions-list')  as HTMLElement;
+  const emptyEl = document.getElementById('sessions-empty') as HTMLElement;
+
+  async function render() {
+    const sessions = await getTabSessions();
+    list.innerHTML = '';
+    emptyEl.classList.toggle('hidden', sessions.length > 0);
+    sessions.forEach(session => {
+      const li = document.createElement('li');
+      li.className = 'session-item';
+      li.innerHTML = `
+        <div class="session-meta">
+          <span class="session-name">${session.name}</span>
+          <span class="session-count">${session.tabs.length} tab${session.tabs.length !== 1 ? 's' : ''}</span>
+          <span class="session-time">${new Date(session.savedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
+        </div>
+        <div class="session-actions">
+          <button class="session-btn session-btn--open" data-id="${session.id}" title="Restore session">Open</button>
+          <button class="session-btn session-btn--del" data-id="${session.id}" title="Delete session">✕</button>
+        </div>`;
+      list.appendChild(li);
+    });
+
+    list.querySelectorAll<HTMLButtonElement>('.session-btn--open').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset['id']!;
+        const sessions = await getTabSessions();
+        const session = sessions.find(s => s.id === id);
+        if (!session) return;
+        session.tabs.forEach(t => chrome.tabs.create({ url: t.url }));
+      });
+    });
+
+    list.querySelectorAll<HTMLButtonElement>('.session-btn--del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset['id']!;
+        const sessions = await getTabSessions();
+        await saveTabSessions(sessions.filter(s => s.id !== id));
+        render();
+      });
+    });
+  }
+
+  document.getElementById('btn-sessions-toggle')?.addEventListener('click', () => {
+    panel.classList.remove('hidden');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) render();
+  });
+
+  document.getElementById('btn-sessions-close')?.addEventListener('click', () => panel.classList.remove('open'));
+
+  document.getElementById('btn-sessions-save')?.addEventListener('click', async () => {
+    const name = prompt('Session name:', `Session ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}`)?.trim();
+    if (!name) return;
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const session: TabSession = {
+      id: `sess_${Date.now()}`,
+      name,
+      savedAt: Date.now(),
+      tabs: tabs.filter(t => t.url && !t.url.startsWith('chrome://')).map(t => ({
+        title: t.title ?? t.url ?? '',
+        url: t.url!,
+        favicon: t.favIconUrl,
+      })),
+    };
+    const sessions = await getTabSessions();
+    sessions.unshift(session);
+    await saveTabSessions(sessions.slice(0, 20));
+    render();
+  });
+
+  render();
+}
+
+// ─── Keyboard shortcuts ────────────────────────────────────────────────────────
+
+function initKeyboardShortcuts() {
+  const shortcutsModal = document.getElementById('shortcuts-modal') as HTMLElement;
+
+  document.addEventListener('keydown', (e) => {
+    // Don't fire if user is typing in an input/textarea
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    if (e.altKey) {
+      switch (e.key.toLowerCase()) {
+        case 'n': e.preventDefault(); document.getElementById('btn-notes-toggle')?.click(); break;
+        case 'p': e.preventDefault(); document.getElementById('btn-pomo-toggle')?.click(); break;
+        case 'h': e.preventDefault(); document.getElementById('btn-habits-toggle')?.click(); break;
+        case 'j': e.preventDefault(); document.getElementById('btn-journal-toggle')?.click(); break;
+        case 'l': e.preventDefault(); document.getElementById('btn-links-toggle')?.click(); break;
+        case 'm': e.preventDefault(); document.getElementById('btn-sound-toggle')?.click(); break;
+        case 's': e.preventDefault(); document.getElementById('btn-sessions-toggle')?.click(); break;
+        case 'w': e.preventDefault(); document.getElementById('btn-news-toggle')?.click(); break;
+        case ',': e.preventDefault(); document.getElementById('btn-settings')?.click(); break;
+        case '?': e.preventDefault(); shortcutsModal.classList.toggle('hidden'); break;
+      }
+    }
+    if (e.key === 'Escape') {
+      shortcutsModal.classList.add('hidden');
+      // Close any open panel
+      document.querySelectorAll('.notes-panel.open, .links-panel.open, .habits-panel.open, .journal-panel.open, .sessions-panel.open').forEach(p => p.classList.remove('open'));
+      document.getElementById('news-panel')?.classList.remove('open');
+    }
+  });
+
+  document.getElementById('btn-shortcuts-close')?.addEventListener('click', () => shortcutsModal.classList.add('hidden'));
+  shortcutsModal.addEventListener('click', (e) => { if (e.target === shortcutsModal) shortcutsModal.classList.add('hidden'); });
+}
+
+// ─── Export data ───────────────────────────────────────────────────────────────
+
+function initExportData() {
+  document.getElementById('btn-export-data')?.addEventListener('click', async () => {
+    const [todos, links, folders, notes, journal, habits, countdowns, sessions, settings] = await Promise.all([
+      getTodos(), getLinks(), getFolders(), getNotesList(),
+      getJournalEntries(), getHabits(), getCountdowns(),
+      getTabSessions(), getSettings(),
+    ]);
+    const data = {
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+      settings: { name: settings.name, theme: settings.theme, searchEngine: settings.searchEngine },
+      todos, links, folders, notes, journal, habits, countdowns, sessions,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `monktab-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    const btn = document.getElementById('btn-export-data') as HTMLButtonElement;
+    const orig = btn.innerHTML;
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Exported!`;
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+  });
+}
+
 // ─── Blocked-site banner ───────────────────────────────────────────────────────
 
 function initBlockedBanner() {
@@ -3178,6 +3393,7 @@ function initSettingsPanel(settings: Settings) {
   initSegmented('seg-theme', 'set-theme');
   initSegmented('seg-engine', 'set-engine');
   initSegmented('seg-bg', 'seg-bg-hidden');
+  initSegmented('seg-quote-cat', 'set-quote-cat');
 
   // Background segmented syncs to radio buttons
   const segBg = document.getElementById('seg-bg');
@@ -3199,8 +3415,10 @@ function initSettingsPanel(settings: Settings) {
   (document.getElementById('set-name') as HTMLInputElement).value = settings.name;
   (document.getElementById('set-engine') as HTMLSelectElement).value = settings.searchEngine;
   (document.getElementById('set-theme') as HTMLSelectElement).value = settings.theme;
+  (document.getElementById('set-quote-cat') as HTMLSelectElement).value = settings.quoteCategory ?? 'motivation';
   initSegmented('seg-theme', 'set-theme');
   initSegmented('seg-engine', 'set-engine');
+  initSegmented('seg-quote-cat', 'set-quote-cat');
 
   (document.getElementById('set-weather') as HTMLInputElement).checked = settings.showWeather;
   (document.getElementById('set-location') as HTMLInputElement).value = settings.locationOverride ?? '';
@@ -3274,6 +3492,7 @@ function initSettingsPanel(settings: Settings) {
       showAi: (document.getElementById('set-ai') as HTMLInputElement).checked,
       showHabits: (document.getElementById('set-habits') as HTMLInputElement).checked,
       showJournal: (document.getElementById('set-journal') as HTMLInputElement).checked,
+      quoteCategory: (document.getElementById('set-quote-cat') as HTMLSelectElement).value as 'motivation' | 'stoic' | 'tech' | 'random',
       unsplashKey: (document.getElementById('set-unsplash') as HTMLInputElement).value.trim(),
       githubUsername: (document.getElementById('set-gh-user') as HTMLInputElement).value.trim(),
       githubToken: (document.getElementById('set-gh-token') as HTMLInputElement).value.trim(),
@@ -3364,11 +3583,14 @@ async function init() {
   initMarkets(settings);
   initPomodoro();
   initFocusMode();
-  initQuoteRefresh();
+  initQuoteRefresh(settings.quoteCategory ?? 'motivation');
   initAI(settings.aiProvider);
   initSoundscapes();
   await initHabits();
   await initJournal();
+  await initTabSessions();
+  initKeyboardShortcuts();
+  initExportData();
   initBlockedBanner();
 
   applyVisibility(settings);
@@ -3389,7 +3611,7 @@ async function init() {
 
   // Async non-blocking
   loadBackground(settings);
-  if (settings.showQuote) loadQuote();
+  if (settings.showQuote) loadQuote(settings.quoteCategory ?? 'motivation');
   if (settings.showWeather) void loadWeather(settings.locationOverride ?? '');
   if (settings.showGithub) loadGithub(settings.githubUsername, settings.githubToken);
 

@@ -23,6 +23,7 @@
     "geolocation",
     "notifications",
     "bookmarks",
+    "tabs",
     "declarativeNetRequest"
   ],
   "host_permissions": [
@@ -43,6 +44,7 @@
     "https://dev.to/*",
     "https://www.reddit.com/*",
     "https://oauth.reddit.com/*",
-    "https://ipapi.co/*"
+    "https://ipapi.co/*",
+    "https://news.google.com/*"
   ]
 }
