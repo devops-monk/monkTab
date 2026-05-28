@@ -47,12 +47,6 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .icon-btn:hover { background: rgba(255,255,255,0.22); }
 .icon-btn svg { flex-shrink: 0; }
 
-.search-form { flex: 1; max-width: 720px; margin: 0 auto; display: flex; align-items: center; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 9px 16px; backdrop-filter: blur(12px); gap: 8px; }
-.search-icon { color: var(--text-dim); flex-shrink: 0; }
-.search-form input { flex: 1; background: none; border: none; outline: none; color: var(--text); font-size: 16px; }
-.search-form input::placeholder { color: var(--text-dimmer); }
-.search-form select { background: none; border: none; outline: none; color: var(--text-dim); font-size: 12px; cursor: pointer; }
-.search-form select option { background: #1a1a2e; color: #fff; }
 
 .weather { display: flex; align-items: center; gap: 5px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 10px; padding: 6px 12px; font-size: 13px; backdrop-filter: blur(12px); cursor: pointer; transition: background var(--transition); }
 .weather:hover { background: rgba(255,255,255,0.22); }

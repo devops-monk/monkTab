@@ -2831,7 +2831,7 @@ function initExportData() {
     const data = {
       exportedAt: new Date().toISOString(),
       version: '1.0',
-      settings: { name: settings.name, theme: settings.theme, searchEngine: settings.searchEngine },
+      settings: { name: settings.name, theme: settings.theme },
       todos, links, folders, notes, journal, habits, countdowns, sessions,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -2906,26 +2906,6 @@ function initBlockedSitesSettings(settings: Settings) {
   });
 }
 
-// ─── Search ───────────────────────────────────────────────────────────────────
-
-function initSearch(engine: string) {
-  const form = document.getElementById('search-form') as HTMLFormElement;
-  const input = document.getElementById('search-input') as HTMLInputElement;
-  const sel = document.getElementById('search-engine') as HTMLSelectElement;
-  sel.value = engine;
-  const urls: Record<string, string> = {
-    google: 'https://www.google.com/search?q=',
-    duckduckgo: 'https://duckduckgo.com/?q=',
-    bing: 'https://www.bing.com/search?q=',
-  };
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const q = input.value.trim();
-    if (!q) return;
-    window.location.href = (urls[sel.value] ?? urls['google']) + encodeURIComponent(q);
-  });
-  sel.addEventListener('change', () => saveSettings({ searchEngine: sel.value as 'google' | 'duckduckgo' | 'bing' }));
-}
 
 // ─── Pomodoro ─────────────────────────────────────────────────────────────────
 
@@ -3646,11 +3626,9 @@ function initSettingsPanel(settings: Settings) {
 
   // Populate values
   (document.getElementById('set-name') as HTMLInputElement).value = settings.name;
-  (document.getElementById('set-engine') as HTMLSelectElement).value = settings.searchEngine;
   (document.getElementById('set-theme') as HTMLSelectElement).value = settings.theme;
   (document.getElementById('set-quote-cat') as HTMLSelectElement).value = settings.quoteCategory ?? 'motivation';
   initSegmented('seg-theme', 'set-theme');
-  initSegmented('seg-engine', 'set-engine');
   initSegmented('seg-quote-cat', 'set-quote-cat');
 
   (document.getElementById('set-weather') as HTMLInputElement).checked = settings.showWeather;
@@ -3710,7 +3688,6 @@ function initSettingsPanel(settings: Settings) {
   document.getElementById('btn-settings-save')?.addEventListener('click', async () => {
     await saveSettings({
       name: (document.getElementById('set-name') as HTMLInputElement).value.trim(),
-      searchEngine: (document.getElementById('set-engine') as HTMLSelectElement).value as 'google' | 'duckduckgo' | 'bing',
       theme: (document.getElementById('set-theme') as HTMLSelectElement).value as 'auto' | 'light' | 'dark',
       showWeather: (document.getElementById('set-weather') as HTMLInputElement).checked,
       showQuote: (document.getElementById('set-quote') as HTMLInputElement).checked,
@@ -3802,7 +3779,6 @@ async function init() {
   applyTheme(settings.theme);
   (document.getElementById('greeting') as HTMLElement).textContent = greeting(settings.name);
 
-  initSearch(settings.searchEngine);
   initSettingsPanel(settings);
   await initFocus();
   await initTodos();

@@ -1,6 +1,5 @@
 export interface Settings {
   name: string;
-  searchEngine: 'google' | 'duckduckgo' | 'bing';
   showWeather: boolean;
   showQuote: boolean;
   showTodos: boolean;
@@ -179,7 +178,6 @@ export async function addYtRecent(track: YtRecentTrack): Promise<void> {
 
 const DEFAULTS: Settings = {
   name: '',
-  searchEngine: 'google',
   showWeather: true,
   showQuote: true,
   showTodos: true,
