@@ -2848,63 +2848,6 @@ function initExportData() {
   });
 }
 
-// ─── Blocked-site banner ───────────────────────────────────────────────────────
-
-function initBlockedBanner() {
-  const params = new URLSearchParams(window.location.search);
-  const blocked = params.get('blocked');
-  if (!blocked) return;
-  const banner = document.getElementById('blocked-banner') as HTMLElement;
-  banner.classList.remove('hidden');
-  document.getElementById('btn-blocked-back')?.addEventListener('click', () => {
-    history.back();
-  });
-  // Clean up the URL so refreshing doesn't re-show the banner
-  history.replaceState({}, '', window.location.pathname);
-}
-
-// ─── Blocked sites settings ────────────────────────────────────────────────────
-
-function renderBlockedSitesList(sites: string[]) {
-  const ul = document.getElementById('blocked-sites-list') as HTMLUListElement;
-  ul.innerHTML = '';
-  if (sites.length === 0) {
-    ul.innerHTML = '<li class="blocked-site-empty">No sites blocked yet</li>';
-    return;
-  }
-  sites.forEach((site, i) => {
-    const li = document.createElement('li');
-    li.className = 'blocked-site-item';
-    const span = document.createElement('span'); span.textContent = site;
-    const del = document.createElement('button');
-    del.className = 'blocked-site-del'; del.textContent = '✕'; del.title = 'Remove';
-    del.addEventListener('click', async () => {
-      const newSites = sites.filter((_, j) => j !== i);
-      await saveSettings({ blockedSites: newSites });
-      renderBlockedSitesList(newSites);
-    });
-    li.append(span, del);
-    ul.appendChild(li);
-  });
-}
-
-function initBlockedSitesSettings(settings: Settings) {
-  const form  = document.getElementById('blocked-site-form') as HTMLFormElement;
-  const input = document.getElementById('blocked-site-input') as HTMLInputElement;
-  let sites   = settings.blockedSites ?? [];
-
-  renderBlockedSitesList(sites);
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    let domain = input.value.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0] ?? '';
-    if (!domain || sites.includes(domain)) { input.value = ''; return; }
-    sites = [...sites, domain];
-    await saveSettings({ blockedSites: sites });
-    renderBlockedSitesList(sites);
-    input.value = '';
-  });
-}
 
 
 // ─── Pomodoro ─────────────────────────────────────────────────────────────────
@@ -3167,8 +3110,6 @@ function updateFmSoundChip() {
 
 function enterFocusMode() {
   focusModeActive = true;
-  // Activate site blocking in the background service worker
-  void chrome.storage.local.set({ mt_focus_blocking: true });
   const overlay = document.getElementById('focus-mode') as HTMLElement;
   overlay.classList.remove('hidden');
   fmTimeEl = document.getElementById('fm-time');
@@ -3190,7 +3131,6 @@ function enterFocusMode() {
 
 function exitFocusMode() {
   focusModeActive = false;
-  void chrome.storage.local.remove('mt_focus_blocking');
   document.getElementById('focus-mode')?.classList.add('hidden');
 }
 
@@ -3654,7 +3594,7 @@ function initSettingsPanel(settings: Settings) {
   (document.getElementById('set-ai') as HTMLInputElement).checked = settings.showAi;
   (document.getElementById('set-habits') as HTMLInputElement).checked = settings.showHabits;
   (document.getElementById('set-journal') as HTMLInputElement).checked = settings.showJournal;
-  initBlockedSitesSettings(settings);
+
   (document.getElementById('set-unsplash') as HTMLInputElement).value = settings.unsplashKey;
   (document.getElementById('set-gh-user') as HTMLInputElement).value = settings.githubUsername;
   (document.getElementById('set-gh-token') as HTMLInputElement).value = settings.githubToken;
@@ -3798,7 +3738,7 @@ async function init() {
   await initTabSessions();
   initKeyboardShortcuts();
   initExportData();
-  initBlockedBanner();
+
 
   applyVisibility(settings);
 

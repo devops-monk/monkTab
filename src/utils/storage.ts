@@ -26,7 +26,7 @@ export interface Settings {
   finnhubKey: string;
   marketWatchlistCrypto: string[];
   marketWatchlistStocks: string[];
-  blockedSites: string[]; // domains blocked during Focus Mode
+
   googleClientId: string; // Google OAuth client ID for Calendar
   quoteCategory: 'motivation' | 'stoic' | 'tech' | 'random';
   tempUnit: 'celsius' | 'fahrenheit';
@@ -208,7 +208,7 @@ const DEFAULTS: Settings = {
   finnhubKey: '',
   marketWatchlistCrypto: ['bitcoin', 'ethereum', 'solana', 'binancecoin'],
   marketWatchlistStocks: ['AAPL', 'NVDA', 'GOOGL', 'MSFT', 'TSLA'],
-  blockedSites: [],
+
   googleClientId: '',
   quoteCategory: 'motivation',
   tempUnit: 'celsius',
@@ -223,7 +223,6 @@ export async function saveSettings(s: Partial<Settings>): Promise<void> {
   const current = await getSettings();
   const merged = { ...current, ...s };
   await chrome.storage.sync.set({ mt_settings: merged });
-  // Mirror to local so the background service worker can read blockedSites without sync quota
   await chrome.storage.local.set({ mt_settings: merged });
 }
 
