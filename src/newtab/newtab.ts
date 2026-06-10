@@ -1577,6 +1577,25 @@ async function initNotes() {
   }
   let activeNoteId = notes[0].id;
 
+  const scrollLeftBtn  = document.getElementById('notes-tabs-scroll-left')  as HTMLButtonElement;
+  const scrollRightBtn = document.getElementById('notes-tabs-scroll-right') as HTMLButtonElement;
+
+  function updateScrollArrows() {
+    const canScrollLeft  = tabsEl.scrollLeft > 0;
+    const canScrollRight = tabsEl.scrollLeft + tabsEl.clientWidth < tabsEl.scrollWidth - 1;
+    scrollLeftBtn.classList.toggle('hidden', !canScrollLeft);
+    scrollRightBtn.classList.toggle('hidden', !canScrollRight);
+  }
+
+  tabsEl.addEventListener('scroll', updateScrollArrows);
+
+  scrollLeftBtn.addEventListener('click', () => {
+    tabsEl.scrollBy({ left: -120, behavior: 'smooth' });
+  });
+  scrollRightBtn.addEventListener('click', () => {
+    tabsEl.scrollBy({ left: 120, behavior: 'smooth' });
+  });
+
   function renderTabs() {
     tabsEl.innerHTML = '';
     notes.forEach(n => {
@@ -1587,6 +1606,7 @@ async function initNotes() {
       btn.addEventListener('click', () => switchNote(n.id));
       tabsEl.appendChild(btn);
     });
+    requestAnimationFrame(updateScrollArrows);
   }
 
   function loadActiveNote() {
@@ -1601,7 +1621,10 @@ async function initNotes() {
     activeNoteId = id;
     renderTabs();
     loadActiveNote();
-    setTimeout(() => textarea.focus(), 60);
+    requestAnimationFrame(() => {
+      tabsEl.querySelector<HTMLElement>('.notes-tab.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+      setTimeout(() => textarea.focus(), 60);
+    });
   }
 
   function updateWordCount() {

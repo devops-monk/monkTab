@@ -357,7 +357,11 @@
     </div>
 
     <!-- Notes tab strip -->
-    <div id="notes-tabs" class="notes-tabs"></div>
+    <div class="notes-tabs-wrapper">
+      <button id="notes-tabs-scroll-left" class="notes-tabs-arrow notes-tabs-arrow--left hidden" aria-label="Scroll tabs left">&#8249;</button>
+      <div id="notes-tabs" class="notes-tabs"></div>
+      <button id="notes-tabs-scroll-right" class="notes-tabs-arrow notes-tabs-arrow--right hidden" aria-label="Scroll tabs right">&#8250;</button>
+    </div>
 
     <!-- Note title -->
     <input id="notes-title-input" class="notes-title-input" type="text" placeholder="Untitled" maxlength="60" spellcheck="false" autocomplete="off" />
