@@ -2151,7 +2151,6 @@ let activeYtId = '';
 let ytPlayStartedAt = 0;
 let ytIsPaused = false;
 let ytPausedPosition = 0; // seconds elapsed when paused; used to resume from correct position
-let ytBlockedTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Playback modes
 let ytShuffle = false;
@@ -2256,8 +2255,6 @@ function playYtVideo(id: string, title: string, ch: string, startSec = 0) {
   ytPlayStartedAt = Date.now() - startSec * 1000;
   ytIsPaused = false;
   setYtBlockedBanner(false);
-  if (ytBlockedTimer) clearTimeout(ytBlockedTimer);
-  ytBlockedTimer = setTimeout(() => setYtBlockedBanner(true), 8000);
   updateNowPlayingView(id, title, ch);
   updatePausePlayUI();
   markActiveCard(id);
@@ -2332,16 +2329,10 @@ window.addEventListener('message', (e) => {
   try {
     const data = JSON.parse(e.data as string);
     if (data.event === 'onError') {
-      if (ytBlockedTimer) { clearTimeout(ytBlockedTimer); ytBlockedTimer = null; }
       setYtBlockedBanner(true);
       return;
     }
     if (data.event !== 'onStateChange') return;
-    // Any state change means the embed loaded — clear the blocked timer
-    if (data.info === 1 || data.info === 3) {
-      if (ytBlockedTimer) { clearTimeout(ytBlockedTimer); ytBlockedTimer = null; }
-      setYtBlockedBanner(false);
-    }
     if (data.info === 0) {
       ytPlayNext();
     } else if (data.info === 2) {
