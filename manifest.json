@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MonkTab — Developer New Tab",
   "short_name": "MonkTab",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A beautiful, privacy-first new tab for developers. Clock, focus goal, todos, weather, quick links & Pomodoro — no account needed.",
   "icons": {
     "16": "icons/icon16.png",
