@@ -2094,7 +2094,7 @@ function parseYouTubeId(input: string): string | null {
   return m ? m[1] : null;
 }
 
-async function fetchYtTitle(id: string): Promise<string> {
+async function fetchYtMeta(id: string): Promise<{ title: string; embeddable: boolean }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
@@ -2102,10 +2102,11 @@ async function fetchYtTitle(id: string): Promise<string> {
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`,
       { signal: controller.signal },
     );
-    if (!r.ok) return 'Custom Video';
+    if (r.status === 401 || r.status === 403) return { title: 'Custom Video', embeddable: false };
+    if (!r.ok) return { title: 'Custom Video', embeddable: true };
     const d = await r.json();
-    return (d.title as string) || 'Custom Video';
-  } catch { return 'Custom Video'; }
+    return { title: (d.title as string) || 'Custom Video', embeddable: true };
+  } catch { return { title: 'Custom Video', embeddable: true }; }
   finally { clearTimeout(timer); }
 }
 
@@ -2470,20 +2471,23 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   });
 
   // Add custom video form
-  const form  = document.getElementById('yt-add-form')  as HTMLFormElement;
-  const input = document.getElementById('yt-add-input') as HTMLInputElement;
+  const form  = document.getElementById('yt-add-form')    as HTMLFormElement;
+  const input = document.getElementById('yt-add-input')   as HTMLInputElement;
+  const embedWarning = document.getElementById('yt-embed-warning') as HTMLElement;
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    embedWarning.classList.add('hidden');
     const id = parseYouTubeId(input.value);
     if (!id) { input.classList.add('yt-add-error'); setTimeout(() => input.classList.remove('yt-add-error'), 1200); return; }
     if (customVideos.some(v => v.id === id) || YT_VIDEOS.some(v => v.id === id)) { input.value = ''; return; }
     const btn = form.querySelector('.yt-add-btn') as HTMLButtonElement;
     btn.textContent = '…'; btn.disabled = true;
-    const title = await fetchYtTitle(id);
+    const { title, embeddable } = await fetchYtMeta(id);
     customVideos.push({ id, title, addedAt: Date.now() });
     await saveCustomYtVideos(customVideos);
     btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add`;
     btn.disabled = false; input.value = '';
+    if (!embeddable) embedWarning.classList.remove('hidden');
     rebuildPlaylist(); renderGrid();
   });
 
@@ -3371,20 +3375,23 @@ function initFocusMode() {
   // FM add form — adds to shared storage and refreshes both grids
   const fmAddForm = document.getElementById('fm-yt-add-form') as HTMLFormElement;
   const fmAddInput = document.getElementById('fm-yt-add-input') as HTMLInputElement;
+  const fmEmbedWarning = document.getElementById('fm-yt-embed-warning') as HTMLElement;
   fmAddForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    fmEmbedWarning.classList.add('hidden');
     const id = parseYouTubeId(fmAddInput.value);
     if (!id) { fmAddInput.classList.add('yt-add-error'); setTimeout(() => fmAddInput.classList.remove('yt-add-error'), 1200); return; }
     const existing = await getCustomYtVideos();
     if (existing.some(v => v.id === id) || YT_VIDEOS.some(v => v.id === id)) { fmAddInput.value = ''; return; }
     const btn = fmAddForm.querySelector('.yt-add-btn') as HTMLButtonElement;
     btn.textContent = '…'; btn.disabled = true;
-    const title = await fetchYtTitle(id);
+    const { title, embeddable } = await fetchYtMeta(id);
     existing.push({ id, title, addedAt: Date.now() });
     await saveCustomYtVideos(existing);
     btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add`;
     btn.disabled = false;
     fmAddInput.value = '';
+    if (!embeddable) fmEmbedWarning.classList.remove('hidden');
     renderFmYtGrid();
   });
 
