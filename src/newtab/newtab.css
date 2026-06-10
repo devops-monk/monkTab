@@ -1000,6 +1000,14 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
 /* YouTube redesign — tab bar */
 .yt-audio-iframe { display: none; }
+.yt-blocked-banner {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin: 0 2px; padding: 8px 12px; border-radius: 8px;
+  background: rgba(251,146,60,0.12); border: 1px solid rgba(251,146,60,0.3);
+  color: rgba(251,146,60,0.9); font-size: 12px; line-height: 1.4;
+}
+.yt-blocked-banner.hidden { display: none; }
+.yt-blocked-banner a { color: #fb923c; text-decoration: underline; white-space: nowrap; margin-left: auto; }
 .yt-tab-bar {
   display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;
 }

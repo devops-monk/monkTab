@@ -439,6 +439,12 @@
       <iframe id="yt-iframe" class="yt-audio-iframe" frameborder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      <!-- Error banner shown when embed is blocked (e.g. Zscaler/corporate proxy) -->
+      <div id="yt-blocked-banner" class="yt-blocked-banner hidden">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Playback blocked by your network. Video embeds may be restricted by a corporate proxy or firewall.</span>
+        <a id="yt-blocked-link" href="#" target="_blank" rel="noopener">Open on YouTube ↗</a>
+      </div>
 
       <!-- Tab bar -->
       <div class="yt-tab-bar">
