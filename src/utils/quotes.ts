@@ -65,29 +65,12 @@ export function getRandomQuote(category?: string): { quote: string; author: stri
   return { quote: pool[idx].q, author: pool[idx].a };
 }
 
-const CATEGORY_API_TAGS: Record<string, string> = {
-  motivation: 'inspirational,success,motivational',
-  stoic: 'philosophy,stoicism,wisdom',
-  tech: 'technology,science,innovation',
-  random: 'inspirational,technology,success',
-};
-
 export async function getQuote(category = 'motivation'): Promise<{ quote: string; author: string }> {
   const daily = await getDaily();
   const cached = daily as (typeof daily & { quoteCategory?: string }) | null;
   if (cached?.date === todayString() && cached.quote && cached.quoteCategory === category) {
     return { quote: cached.quote, author: cached.quoteAuthor };
   }
-
-  try {
-    const tags = CATEGORY_API_TAGS[category] ?? CATEGORY_API_TAGS['motivation'];
-    const res = await fetch(`https://api.quotable.io/random?tags=${tags}&maxLength=160`);
-    if (res.ok) {
-      const data = await res.json() as { content: string; author: string };
-      await saveDaily({ quote: data.content, quoteAuthor: data.author });
-      return { quote: data.content, author: data.author };
-    }
-  } catch { /* fall through */ }
 
   const pool = QUOTE_POOLS[category] ?? MOTIVATION_QUOTES;
   const fallback = pool[todayIndexFor(pool)];

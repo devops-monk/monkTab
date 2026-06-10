@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MonkTab — Developer New Tab",
   "short_name": "MonkTab",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A beautiful, privacy-first new tab for developers. Clock, focus goal, todos, weather, quick links & Pomodoro — no account needed.",
   "icons": {
     "16": "icons/icon16.png",
@@ -27,7 +27,6 @@
   ],
   "host_permissions": [
     "https://api.open-meteo.com/*",
-    "https://api.quotable.io/*",
     "https://geocoding-api.open-meteo.com/*",
     "https://nominatim.openstreetmap.org/*",
     "https://picsum.photos/*",
