@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MonkTab — Developer New Tab",
   "short_name": "MonkTab",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A beautiful, privacy-first new tab for developers. Clock, focus goal, todos, weather, quick links & Pomodoro — no account needed.",
   "icons": {
     "16": "icons/icon16.png",
@@ -43,6 +43,7 @@
     "https://oauth.reddit.com/*",
     "https://ipapi.co/*",
     "https://news.google.com/*",
+    "https://icons.duckduckgo.com/*",
     "https://query1.finance.yahoo.com/*",
     "https://query2.finance.yahoo.com/*"
   ]

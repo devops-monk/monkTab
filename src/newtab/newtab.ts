@@ -494,7 +494,7 @@ const collapsedFolders = new Set<string>();
 let linksSearchQuery = '';
 
 function faviconUrl(url: string): string {
-  try { return `https://www.google.com/s2/favicons?domain=${new URL(url).origin}&sz=32`; }
+  try { return `https://icons.duckduckgo.com/ip3/${new URL(url).hostname}.ico`; }
   catch { return ''; }
 }
 
