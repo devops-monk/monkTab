@@ -2,12 +2,11 @@ import {
   getSettings, saveSettings, getDaily, saveDaily, getTodos, saveTodos,
   getLinks, saveLinks, getFolders, saveFolders, getNotes, saveNotes, getCountdowns, saveCountdowns,
   getFocusHistory, logFocusSession, getCustomYtVideos, saveCustomYtVideos,
+  getYtBlockedIds, addYtBlockedId, getYtVolume, saveYtVolume,
   getYtPlayState, saveYtPlayState, clearYtPlayState, getYtRecent, addYtRecent,
-  getHabits, saveHabits, getTodayHabitLog, saveHabitLog, getHabitStreak,
-  getJournalEntries, saveJournalEntry,
   getTabSessions, saveTabSessions, getNotesList, saveNotesList, getAiHistory, addAiHistory,
   todayString, type Todo, type QuickLink, type QuickLinkFolder, type Countdown, type WorldClock, type Settings,
-  type CustomYtVideo, type YtPlayState, type WatchItem, type Habit, type JournalEntry,
+  type CustomYtVideo, type YtPlayState, type WatchItem,
   type TabSession, type Note,
   getWatchlist, saveWatchlist,
 } from '../utils/storage';
@@ -15,7 +14,8 @@ import { fetchWeather } from '../utils/weather';
 import { getBackground } from '../utils/background';
 import { getQuote, getRandomQuote } from '../utils/quotes';
 import { fetchOpenPRs, timeAgo } from '../utils/github';
-import { SOUNDSCAPES, playSoundscape, stopSoundscape, setSoundVolume } from '../utils/soundscapes';
+import { SOUNDSCAPES, playSoundscape, stopSoundscape, setSoundVolume, preloadSoundscape } from '../utils/soundscapes';
+import { TIMEZONES, POPULAR_TZ, countryFlag, type TzEntry, type TzHit } from '../utils/timezones';
 
 // ─── Clock ────────────────────────────────────────────────────────────────────
 
@@ -1221,6 +1221,10 @@ interface NewsItem {
   time: number;   // unix seconds
   comments: number;
   domain: string;
+  image?: string;   // lead image, when the source provides one
+  source?: string;  // human-readable publication name
+  badge?: string;   // short tag shown on the card, e.g. a release version
+  summary?: string; // one-line teaser for the hero card
 }
 
 const NEWS_CACHE_TTL = 30 * 60 * 1000;
@@ -1254,6 +1258,7 @@ async function fetchHNTop(): Promise<NewsItem[]> {
     time: Math.floor(new Date(h.created_at).getTime() / 1000),
     comments: h.num_comments ?? 0,
     domain: h.url ? newsExtractDomain(h.url) : 'news.ycombinator.com',
+    source: h.url ? newsExtractDomain(h.url) : 'Hacker News',
   })).filter((i: NewsItem) => i.title);
 }
 
@@ -1273,6 +1278,7 @@ async function fetchHNRising(): Promise<NewsItem[]> {
     time: Math.floor(new Date(h.created_at).getTime() / 1000),
     comments: h.num_comments ?? 0,
     domain: h.url ? newsExtractDomain(h.url) : 'news.ycombinator.com',
+    source: h.url ? newsExtractDomain(h.url) : 'Hacker News',
   })).filter((i: NewsItem) => i.title);
 }
 
@@ -1288,7 +1294,10 @@ async function fetchReddit(subreddits: string[]): Promise<NewsItem[]> {
     if (res.status !== 'fulfilled') return;
     const children: any[] = res.value?.data?.children ?? [];
     children.forEach(({ data: d }) => {
-      if (!d.title || d.stickied || d.score < 10) return;
+      if (!d.title || d.stickied || d.score < 10 || d.over_18) return;
+      // raw_json=1 means these URLs arrive unescaped; prefer the largest preview
+      const preview = d.preview?.images?.[0]?.source?.url as string | undefined;
+      const thumb = typeof d.thumbnail === 'string' && d.thumbnail.startsWith('http') ? d.thumbnail : undefined;
       all.push({
         id: `r_${d.id}`,
         title: d.title,
@@ -1298,6 +1307,9 @@ async function fetchReddit(subreddits: string[]): Promise<NewsItem[]> {
         time: Math.floor(d.created_utc),
         comments: d.num_comments ?? 0,
         domain: d.is_self ? `r/${d.subreddit}` : (d.domain ?? 'reddit.com'),
+        image: preview ?? thumb,
+        source: `r/${d.subreddit}`,
+        summary: typeof d.selftext === 'string' ? d.selftext.slice(0, 180) : undefined,
       });
     });
   });
@@ -1323,6 +1335,9 @@ async function fetchDevTo(tags: string): Promise<NewsItem[]> {
     time: Math.floor(new Date(a.published_at).getTime() / 1000),
     comments: a.comments_count ?? 0,
     domain: 'dev.to',
+    image: a.cover_image ?? a.social_image ?? undefined,
+    source: 'DEV',
+    summary: a.description ?? undefined,
   })).filter(i => i.title);
 }
 
@@ -1334,47 +1349,193 @@ function mergeNewsItems(...lists: Array<NewsItem[]>): NewsItem[] {
     .slice(0, 20);
 }
 
+// ── Generic RSS / Atom reader ────────────────────────────────────────────────
+
+function feedText(el: Element, ...names: string[]): string {
+  for (const n of names) {
+    const found = el.getElementsByTagName(n)[0]
+      ?? el.getElementsByTagNameNS('*', n.split(':').pop()!)[0];
+    const v = found?.textContent?.trim();
+    if (v) return v;
+  }
+  return '';
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;|&#\d+;/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+/** Pull a lead image out of a feed entry, trying the standard places in order. */
+function feedImage(el: Element, html: string): string | undefined {
+  const attrOf = (tag: string, attr = 'url') => {
+    const nodes = [
+      ...Array.from(el.getElementsByTagName(tag)),
+      ...Array.from(el.getElementsByTagNameNS('*', tag.split(':').pop()!)),
+    ];
+    for (const n of nodes) {
+      const v = n.getAttribute(attr);
+      const type = n.getAttribute('type') ?? '';
+      const medium = n.getAttribute('medium') ?? '';
+      if (!v) continue;
+      if (tag === 'enclosure' && type && !type.startsWith('image/')) continue;
+      if (tag === 'media:content' && medium && medium !== 'image') continue;
+      return v;
+    }
+    return undefined;
+  };
+  const found = attrOf('media:thumbnail') ?? attrOf('media:content') ?? attrOf('enclosure');
+  if (found) return found;
+  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return m?.[1];
+}
+
+interface FeedOpts { source: string; limit?: number; badge?: (title: string) => string | undefined }
+
+async function fetchFeed(url: string, opts: FeedOpts): Promise<NewsItem[]> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
+  if (!res.ok) throw new Error(`${opts.source}: HTTP ${res.status}`);
+  const doc = new DOMParser().parseFromString(await res.text(), 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error(`${opts.source}: malformed feed`);
+
+  const entries = Array.from(doc.querySelectorAll('item, entry')).slice(0, opts.limit ?? 15);
+  return entries.map((el) => {
+    const title = feedText(el, 'title');
+    // RSS puts the URL in <link> text; Atom puts it in a link element's href
+    let link = feedText(el, 'link');
+    if (!link) {
+      const alt = Array.from(el.getElementsByTagName('link'))
+        .find(l => (l.getAttribute('rel') ?? 'alternate') === 'alternate');
+      link = alt?.getAttribute('href') ?? '';
+    }
+    const raw = feedText(el, 'content:encoded', 'content', 'description', 'summary');
+    const dateStr = feedText(el, 'pubDate', 'published', 'updated', 'dc:date');
+    const time = dateStr ? Math.floor(new Date(dateStr).getTime() / 1000) : Math.floor(Date.now() / 1000);
+    return {
+      id: feedText(el, 'guid', 'id') || link || title,
+      title: title.replace(/\s+/g, ' ').trim(),
+      url: link,
+      score: 0,
+      by: feedText(el, 'dc:creator', 'author', 'name'),
+      time: Number.isFinite(time) ? time : Math.floor(Date.now() / 1000),
+      comments: 0,
+      domain: newsExtractDomain(link) || opts.source,
+      image: feedImage(el, raw),
+      source: opts.source,
+      badge: opts.badge?.(title),
+      summary: stripHtml(raw).slice(0, 180),
+    } as NewsItem;
+  }).filter(i => i.title && i.url);
+}
+
+/** Run several feeds concurrently; a dead feed must never take the tab down with it. */
+async function fetchFeeds(feeds: Array<[string, FeedOpts]>): Promise<NewsItem[]> {
+  const settled = await Promise.allSettled(feeds.map(([u, o]) => fetchFeed(u, o)));
+  settled.forEach((s, i) => {
+    if (s.status === 'rejected') console.warn('[MonkTab] feed failed:', feeds[i][0], s.reason);
+  });
+  return settled.flatMap(s => s.status === 'fulfilled' ? s.value : []);
+}
+
+/** Newest-first, deduped — for feeds where recency matters more than score. */
+function mergeByRecency(...lists: NewsItem[][]): NewsItem[] {
+  const seen = new Set<string>();
+  return lists.flat()
+    .filter(i => {
+      const key = i.url || String(i.id);
+      return seen.has(key) ? false : (seen.add(key), true);
+    })
+    .sort((a, b) => b.time - a.time)
+    .slice(0, 24);
+}
+
 async function fetchAINews(): Promise<NewsItem[]> {
-  const [reddit, devto] = await Promise.allSettled([
-    fetchReddit(['MachineLearning', 'LocalLLaMA', 'artificial', 'OpenAI']),
-    fetchDevTo('ai,machinelearning,llm,openai'),
+  const [feeds, reddit] = await Promise.allSettled([
+    fetchFeeds([
+      ['https://openai.com/news/rss.xml',                       { source: 'OpenAI' }],
+      ['https://huggingface.co/blog/feed.xml',                  { source: 'Hugging Face' }],
+      ['https://deepmind.google/blog/rss.xml',                  { source: 'Google DeepMind' }],
+      ['https://feeds.arstechnica.com/arstechnica/technology-lab', { source: 'Ars Technica' }],
+    ]),
+    fetchReddit(['MachineLearning', 'LocalLLaMA']),
   ]);
-  return mergeNewsItems(
+  return mergeByRecency(
+    feeds.status === 'fulfilled' ? feeds.value : [],
     reddit.status === 'fulfilled' ? reddit.value : [],
-    devto.status === 'fulfilled' ? devto.value : [],
   );
+}
+
+// Projects tracked on the Releases tab. GitHub publishes a public Atom feed of
+// releases for every repo — no token, no rate limit worth worrying about.
+const RELEASE_REPOS: Array<[string, string]> = [
+  ['spring-projects/spring-boot', 'Spring Boot'],
+  ['microsoft/TypeScript',        'TypeScript'],
+  ['python/cpython',              'Python'],
+  ['nodejs/node',                 'Node.js'],
+  ['golang/go',                   'Go'],
+  ['rust-lang/rust',              'Rust'],
+  ['facebook/react',              'React'],
+  ['vuejs/core',                  'Vue'],
+  ['angular/angular',             'Angular'],
+  ['kubernetes/kubernetes',       'Kubernetes'],
+  ['docker/compose',              'Docker Compose'],
+  ['postgres/postgres',           'PostgreSQL'],
+  ['denoland/deno',               'Deno'],
+  ['oven-sh/bun',                 'Bun'],
+  ['django/django',               'Django'],
+  ['laravel/laravel',             'Laravel'],
+  ['vitejs/vite',                 'Vite'],
+  ['tailwindlabs/tailwindcss',    'Tailwind CSS'],
+];
+
+/** Pull a version-looking token out of a release title for the card badge. */
+function releaseVersion(title: string): string | undefined {
+  const m = title.match(/v?(\d+\.\d+(?:\.\d+)?(?:[-.][a-z0-9]+)*)/i);
+  return m ? m[0].replace(/^v/i, '') : undefined;
 }
 
 async function fetchReleasesNews(): Promise<NewsItem[]> {
-  const [reddit, devto] = await Promise.allSettled([
-    fetchReddit(['programming', 'webdev', 'javascript', 'java', 'Python']),
-    fetchDevTo('javascript,typescript,python,java,webdev,react'),
-  ]);
-  return mergeNewsItems(
-    reddit.status === 'fulfilled' ? reddit.value : [],
-    devto.status === 'fulfilled' ? devto.value : [],
-  );
+  const items = await fetchFeeds(RELEASE_REPOS.map(([repo, name]) => [
+    `https://github.com/${repo}/releases.atom`,
+    { source: name, limit: 3, badge: releaseVersion } as FeedOpts,
+  ]));
+  // Use the org avatar rather than the release author's — it identifies the project
+  items.forEach((i) => {
+    const owner = i.url.match(/github\.com\/([^/]+)\//)?.[1];
+    if (owner) i.image = `https://github.com/${owner}.png?size=120`;
+    i.domain = 'github.com';
+  });
+  // Drop pre-releases; most people want stable versions on a glanceable feed
+  return mergeByRecency(items.filter(i => !/\b(rc|alpha|beta|preview|nightly|dev)\b/i.test(i.title)));
 }
 
 async function fetchSecurityNews(): Promise<NewsItem[]> {
-  const [reddit, devto] = await Promise.allSettled([
-    fetchReddit(['netsec', 'cybersecurity', 'hacking']),
-    fetchDevTo('security,cybersecurity,hacking'),
+  const [feeds, reddit] = await Promise.allSettled([
+    fetchFeeds([
+      ['https://feeds.feedburner.com/TheHackersNews', { source: 'The Hacker News' }],
+      ['https://krebsonsecurity.com/feed/',           { source: 'Krebs on Security' }],
+      ['https://www.darkreading.com/rss.xml',         { source: 'Dark Reading' }],
+    ]),
+    fetchReddit(['netsec']),
   ]);
-  return mergeNewsItems(
+  return mergeByRecency(
+    feeds.status === 'fulfilled' ? feeds.value : [],
     reddit.status === 'fulfilled' ? reddit.value : [],
-    devto.status === 'fulfilled' ? devto.value : [],
   );
 }
 
 async function fetchCloudNews(): Promise<NewsItem[]> {
-  const [reddit, devto] = await Promise.allSettled([
-    fetchReddit(['aws', 'devops', 'kubernetes', 'docker', 'sysadmin']),
-    fetchDevTo('devops,cloud,aws,kubernetes,docker'),
+  const [feeds, reddit] = await Promise.allSettled([
+    fetchFeeds([
+      ['https://aws.amazon.com/about-aws/whats-new/recent/feed/', { source: 'AWS' }],
+      ['https://cloudblog.withgoogle.com/rss/',                   { source: 'Google Cloud' }],
+      ['https://kubernetes.io/feed.xml',                          { source: 'Kubernetes' }],
+    ]),
+    fetchReddit(['devops', 'kubernetes']),
   ]);
-  return mergeNewsItems(
+  return mergeByRecency(
+    feeds.status === 'fulfilled' ? feeds.value : [],
     reddit.status === 'fulfilled' ? reddit.value : [],
-    devto.status === 'fulfilled' ? devto.value : [],
   );
 }
 
@@ -1404,16 +1565,75 @@ async function fetchGoogleNews(): Promise<NewsItem[]> {
 
 function renderNewsSkeleton() {
   const feed = document.getElementById('news-feed')!;
-  feed.innerHTML = Array.from({ length: 7 }).map(() => `
+  const card = `
     <div class="news-skeleton-card">
-      <div class="sk-line sk-title-1"></div>
-      <div class="sk-line sk-title-2"></div>
-      <div class="sk-line sk-meta"></div>
-    </div>`).join('');
+      <div class="sk-line sk-thumb"></div>
+      <div class="sk-body">
+        <div class="sk-line sk-title-1"></div>
+        <div class="sk-line sk-title-2"></div>
+        <div class="sk-line sk-meta"></div>
+      </div>
+    </div>`;
+  feed.innerHTML = `
+    <div class="news-skeleton-hero"></div>
+    <div class="news-grid">${card.repeat(6)}</div>`;
 }
 
 function newsFaviconUrl(domain: string): string {
   return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+}
+
+function newsEscape(s: string): string {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/** Stable hue per source, so a publication keeps the same accent colour every time. */
+function newsHue(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
+  return h;
+}
+
+/**
+ * Many good sources (HN, Google News, AWS) ship no images at all. Rather than leave a
+ * hole, draw a deterministic gradient tile branded with the source's favicon — it reads
+ * as a design choice instead of a broken image.
+ */
+function newsThumb(item: NewsItem, cls: string): string {
+  const domainClean = (item.domain ?? '').replace(/^r\//, '');
+  const faviconDomain = item.domain?.startsWith('r/') ? 'reddit.com' : (domainClean || 'example.com');
+  const hue = newsHue(item.source ?? item.domain ?? item.title);
+  const fallback = `
+    <span class="news-thumb-fallback" style="--h:${hue}">
+      <img src="${newsFaviconUrl(faviconDomain)}" alt="" loading="lazy"
+           onerror="this.style.visibility='hidden'">
+    </span>`;
+  if (!item.image) return `<div class="${cls}">${fallback}</div>`;
+  // If the image 404s or is hotlink-blocked, swap in the gradient tile
+  return `
+    <div class="${cls}">
+      ${fallback}
+      <img class="news-thumb-img" src="${newsEscape(item.image)}" alt="" loading="lazy"
+           onerror="this.remove()">
+    </div>`;
+}
+
+function newsMeta(item: NewsItem): string {
+  const scoreColor = item.score >= 300 ? '#fb923c' : item.score >= 100 ? '#a78bfa' : '#4ade80';
+  return `
+    <div class="news-card-meta">
+      <span class="news-source">${newsEscape(item.source || item.domain || '')}</span>
+      <span class="news-sep">·</span>
+      <span class="news-time">${newsTimeAgo(item.time)}</span>
+      ${item.score ? `<span class="news-score" style="color:${scoreColor};background:${scoreColor}1a">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        ${item.score}</span>` : ''}
+      ${item.comments ? `<span class="news-comments">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        ${item.comments}</span>` : ''}
+    </div>`;
 }
 
 function renderNewsCards(items: NewsItem[]) {
@@ -1422,38 +1642,33 @@ function renderNewsCards(items: NewsItem[]) {
     feed.innerHTML = '<p class="news-empty">No stories found.</p>';
     return;
   }
-  feed.innerHTML = '';
-  items.forEach((item) => {
-    const a = document.createElement('a');
-    a.className = 'news-card';
-    a.href = item.url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    const scoreColor = item.score >= 300 ? '#fb923c' : item.score >= 100 ? '#a78bfa' : '#4ade80';
-    const domainClean = item.domain?.replace(/^r\//, '') ?? '';
-    const isReddit = item.domain?.startsWith('r/');
-    const faviconDomain = isReddit ? 'reddit.com' : (domainClean || 'example.com');
-    a.innerHTML = `
-      <div class="news-card-body">
-        <img class="news-favicon" src="${newsFaviconUrl(faviconDomain)}" width="14" height="14" alt="" loading="lazy" onerror="this.style.display='none'">
-        <div class="news-card-right">
-          <div class="news-card-title">${item.title}</div>
-          <div class="news-card-meta">
-            ${item.score ? `<span class="news-score" style="color:${scoreColor};background:${scoreColor}1a">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              ${item.score}
-            </span><span class="news-sep">·</span>` : ''}
-            ${item.domain ? `<span class="news-domain">${item.domain}</span><span class="news-sep">·</span>` : ''}
-            <span class="news-time">${newsTimeAgo(item.time)}</span>
-            ${item.comments ? `<span class="news-comments">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              ${item.comments}
-            </span>` : ''}
-          </div>
-        </div>
-      </div>`;
-    feed.appendChild(a);
-  });
+
+  // Lead with a story that actually has artwork — a hero with a fallback tile is dull
+  const heroIdx = Math.max(0, items.findIndex(i => i.image));
+  const hero = items[heroIdx];
+  const rest = items.filter((_, i) => i !== heroIdx);
+
+  const card = (item: NewsItem) => `
+    <a class="news-card" href="${newsEscape(item.url)}" target="_blank" rel="noopener noreferrer">
+      ${newsThumb(item, 'news-card-thumb')}
+      <div class="news-card-text">
+        <div class="news-card-title">${newsEscape(item.title)}</div>
+        ${newsMeta(item)}
+      </div>
+      ${item.badge ? `<span class="news-badge">${newsEscape(item.badge)}</span>` : ''}
+    </a>`;
+
+  feed.innerHTML = `
+    <a class="news-hero" href="${newsEscape(hero.url)}" target="_blank" rel="noopener noreferrer">
+      ${newsThumb(hero, 'news-hero-thumb')}
+      <div class="news-hero-overlay">
+        ${hero.badge ? `<span class="news-badge news-badge--hero">${newsEscape(hero.badge)}</span>` : ''}
+        <div class="news-hero-title">${newsEscape(hero.title)}</div>
+        ${hero.summary ? `<div class="news-hero-summary">${newsEscape(hero.summary)}</div>` : ''}
+        ${newsMeta(hero)}
+      </div>
+    </a>
+    <div class="news-grid">${rest.map(card).join('')}</div>`;
 }
 
 function setNewsSpinner(visible: boolean) {
@@ -1961,6 +2176,8 @@ function initSoundscapes() {
       const chip = document.createElement('button');
       chip.className = `sv-chip${activeVariantId === v.id ? ' active' : ''}`;
       chip.textContent = v.label;
+      // Start fetching the recording on hover so the click plays instantly
+      chip.addEventListener('mouseenter', () => preloadSoundscape(v.id), { once: true });
       chip.addEventListener('click', () => {
         // If same variant is playing — stop it (toggle off)
         if (activeVariantId === v.id) {
@@ -2020,7 +2237,22 @@ function initSoundscapes() {
     grid.appendChild(btn);
   });
 
-  volumeSlider.addEventListener('input', () => setSoundVolume(parseInt(volumeSlider.value, 10)));
+  // One volume for both engines: Web Audio soundscapes and the YouTube player
+  void getYtVolume().then(v => {
+    ytVolume = v;
+    volumeSlider.value = String(v);
+    const fmSlider = document.getElementById('fm-volume') as HTMLInputElement | null;
+    if (fmSlider) fmSlider.value = String(v);
+    setSoundVolume(v);
+    ytApplyVolume();
+  });
+  volumeSlider.addEventListener('input', () => {
+    const v = parseInt(volumeSlider.value, 10);
+    setSoundVolume(v);
+    ytSetVolume(v);
+    const fmSlider = document.getElementById('fm-volume') as HTMLInputElement | null;
+    if (fmSlider) fmSlider.value = volumeSlider.value;
+  });
 
   // ── Tab switching (Soundscapes / YouTube) ──
   const ytSection = document.getElementById('yt-section') as HTMLElement;
@@ -2152,6 +2384,50 @@ let ytPlayStartedAt = 0;
 let ytIsPaused = false;
 let ytPausedPosition = 0; // seconds elapsed when paused; used to resume from correct position
 
+// ── IFrame API bridge state ──
+// YouTube only posts player events (onStateChange / infoDelivery) to the parent AFTER
+// the parent sends a `listening` handshake. Without it the ENDED event never arrives
+// and playback simply stops at the end of a track.
+let ytApiBound = false;      // true once the player has answered the handshake
+let ytHandshakeTimer = 0;
+let ytLoadToken = 0;         // bumped on every playYtVideo — invalidates stale timers/events
+let ytEndedToken = -1;       // token for which ENDED was already handled (dedupe)
+let ytErrorSkipToken = -1;   // token for which we already auto-skipped an unplayable video
+let ytErrorSkips = 0;        // consecutive auto-skips; reset once something actually plays
+let ytDuration = 0;          // seconds, from infoDelivery (0 = unknown)
+let ytEndTimer = 0;          // backstop timer in case the ENDED event is missed
+let ytElapsedEl: HTMLElement | null = null;
+
+// ── Scrub bar ──
+let ytScrubEl: HTMLElement | null = null;
+let ytScrubFill: HTMLElement | null = null;
+let ytScrubKnob: HTMLElement | null = null;
+let ytScrubTip: HTMLElement | null = null;
+let ytDurationEl: HTMLElement | null = null;
+let ytScrubbing = false;   // while true, player updates must not fight the drag
+let ytScrubRatio = 0;
+
+// ── Volume (shared with the soundscape slider) ──
+let ytVolume = 50;
+let ytVolumeSaveTimer = 0;
+
+/** Push the current volume to the embedded player. Safe to call before it's ready. */
+function ytApplyVolume() {
+  const win = activeYtIframe?.contentWindow;
+  if (!win || !activeYtIframe?.src.includes('youtube-nocookie.com')) return;
+  win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [ytVolume] }), '*');
+  // setVolume(0) does not mute a muted-by-user player, so drive mute explicitly too
+  win.postMessage(JSON.stringify({ event: 'command', func: ytVolume === 0 ? 'mute' : 'unMute', args: [] }), '*');
+}
+
+/** Called by every volume slider in the UI. */
+function ytSetVolume(v: number) {
+  ytVolume = Math.max(0, Math.min(100, Math.round(v)));
+  ytApplyVolume();
+  clearTimeout(ytVolumeSaveTimer);
+  ytVolumeSaveTimer = window.setTimeout(() => void saveYtVolume(ytVolume), 400);
+}
+
 // Playback modes
 let ytShuffle = false;
 let ytLoopMode: 'all' | 'one' | 'none' = 'all';
@@ -2239,27 +2515,189 @@ function updateNowPlayingView(id: string, title: string, ch: string) {
   document.getElementById('yt-tab-nowplaying')?.classList.remove('hidden');
 }
 
-function setYtBlockedBanner(visible: boolean) {
+// IDs the player has told us cannot be embedded (owner disabled off-site playback).
+const ytBlockedIds = new Set<string>();
+
+function setYtBlockedBanner(visible: boolean, reason?: string) {
   const banner = document.getElementById('yt-blocked-banner');
   const link   = document.getElementById('yt-blocked-link') as HTMLAnchorElement | null;
   if (!banner) return;
   banner.classList.toggle('hidden', !visible);
+  const msg = banner.querySelector('span');
+  if (visible && msg) {
+    msg.textContent = reason
+      ?? 'Playback blocked by your network. Video embeds may be restricted by a corporate proxy or firewall.';
+  }
   if (visible && link) link.href = `https://www.youtube.com/watch?v=${activeYtId}`;
+}
+
+function markBlockedCards() {
+  document.querySelectorAll<HTMLElement>('.yt-card').forEach(el => {
+    const id = el.dataset['ytId'];
+    const blocked = !!id && ytBlockedIds.has(id);
+    el.classList.toggle('yt-card--blocked', blocked);
+    if (blocked) el.title = "This video's owner doesn't allow playback outside YouTube";
+  });
+}
+
+function ytFmtTime(sec: number): string {
+  const s = Math.floor(Math.max(0, sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+function setScrubVisual(ratio: number) {
+  const pct = `${(Math.min(1, Math.max(0, ratio)) * 100).toFixed(3)}%`;
+  if (ytScrubFill) ytScrubFill.style.width = pct;
+  if (ytScrubKnob) ytScrubKnob.style.left = pct;
+  if (ytScrubTip) ytScrubTip.style.left = pct;
+}
+
+function renderYtElapsed(sec: number) {
+  const hasDuration = ytDuration > 0;
+  if (ytDurationEl) ytDurationEl.textContent = hasDuration ? ytFmtTime(ytDuration) : '--:--';
+  // Live streams (and tracks whose duration hasn't arrived yet) have nothing to scrub
+  ytScrubEl?.classList.toggle('yt-scrub--live', !hasDuration);
+  if (ytScrubbing) return; // the user is dragging — their position wins
+  if (ytElapsedEl) ytElapsedEl.textContent = ytFmtTime(sec);
+  setScrubVisual(hasDuration ? sec / ytDuration : 0);
+  if (ytScrubEl && hasDuration) {
+    ytScrubEl.setAttribute('aria-valuemax', String(Math.floor(ytDuration)));
+    ytScrubEl.setAttribute('aria-valuenow', String(Math.floor(Math.max(0, sec))));
+    ytScrubEl.setAttribute('aria-valuetext', `${ytFmtTime(sec)} of ${ytFmtTime(ytDuration)}`);
+  }
+}
+
+/** Seek the active player to an absolute position, keeping all local clocks in sync. */
+function ytSeekTo(pos: number) {
+  if (!activeYtIframe || !activeYtId) return;
+  // Guard: iframe not yet loaded (e.g. restored paused state) — origin mismatch would occur
+  if (!activeYtIframe.src.includes('youtube-nocookie.com')) return;
+  const clamped = ytDuration > 0
+    ? Math.min(Math.max(0, pos), Math.max(0, ytDuration - 0.5))
+    : Math.max(0, pos);
+  activeYtIframe.contentWindow?.postMessage(
+    JSON.stringify({ event: 'command', func: 'seekTo', args: [clamped, true] }),
+    '*',
+  );
+  if (ytIsPaused) ytPausedPosition = clamped;
+  else ytPlayStartedAt = Date.now() - clamped * 1000;
+  ytEndedToken = -1; // scrubbing backwards must re-arm the end-of-track handler
+  renderYtElapsed(clamped);
+  scheduleYtEndFallback(clamped);
+}
+
+/**
+ * Perform the IFrame API handshake with the embedded player.
+ * The player ignores messages until it has finished loading, so we retry until it
+ * answers (ytApiBound) or we give up after ~15s.
+ */
+function ytBindIframe(iframe: HTMLIFrameElement) {
+  clearInterval(ytHandshakeTimer);
+  ytApiBound = false;
+  let tries = 0;
+  const send = () => {
+    const win = iframe.contentWindow;
+    if (!win || !iframe.src.includes('youtube-nocookie.com')) return;
+    win.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*');
+    win.postMessage(JSON.stringify({ event: 'command', func: 'addEventListener', args: ['onStateChange'] }), '*');
+    win.postMessage(JSON.stringify({ event: 'command', func: 'addEventListener', args: ['onError'] }), '*');
+  };
+  ytHandshakeTimer = window.setInterval(() => {
+    if (ytApiBound) { clearInterval(ytHandshakeTimer); ytHandshakeTimer = 0; return; }
+    if (++tries > 60) {
+      clearInterval(ytHandshakeTimer); ytHandshakeTimer = 0;
+      console.warn('[MonkTab] YouTube player never answered the IFrame API handshake — ' +
+        'falling back to timer-based auto-advance.');
+      return;
+    }
+    send();
+  }, 250);
+  // The player ignores messages sent before it finishes loading, so send on load too.
+  iframe.addEventListener('load', send, { once: true });
+  send();
+}
+
+// Durations resolved from the watch page, cached per video id.
+const ytDurationCache = new Map<string, number>();
+
+/**
+ * Fallback duration source. If the IFrame API never reports a duration (handshake
+ * blocked by a proxy, throttled tab), scrape `lengthSeconds` off the watch page —
+ * we already hold host permission for www.youtube.com. This keeps the scrub bar and
+ * the end-of-track auto-advance working even with no player events at all.
+ */
+async function loadYtDurationFallback(id: string, token: number) {
+  const cached = ytDurationCache.get(id);
+  if (cached) {
+    if (token === ytLoadToken && !ytDuration) {
+      ytDuration = cached;
+      renderYtElapsed(Math.max(0, (Date.now() - ytPlayStartedAt) / 1000));
+      scheduleYtEndFallback(Math.max(0, (Date.now() - ytPlayStartedAt) / 1000));
+    }
+    return;
+  }
+  // Give the player a moment — its own duration is authoritative when it arrives.
+  await new Promise(r => setTimeout(r, 2500));
+  if (token !== ytLoadToken || ytDuration > 0) return;
+  try {
+    const r = await fetch(`https://www.youtube.com/watch?v=${id}`);
+    if (!r.ok) return;
+    const html = await r.text();
+    const m = html.match(/"lengthSeconds":"(\d+)"/);
+    const secs = m ? Number(m[1]) : 0;
+    if (!secs || token !== ytLoadToken || ytDuration > 0) return;
+    ytDurationCache.set(id, secs);
+    ytDuration = secs;
+    const pos = ytIsPaused ? ytPausedPosition : Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
+    renderYtElapsed(pos);
+    scheduleYtEndFallback(pos);
+  } catch { /* offline or blocked — scrub bar stays in live mode */ }
+}
+
+/**
+ * Backstop: if the ENDED event is ever missed (blocked message, throttled tab),
+ * advance once the track's known duration has elapsed.
+ */
+function scheduleYtEndFallback(currentTime: number) {
+  clearTimeout(ytEndTimer);
+  if (!ytDuration || ytIsPaused) return;
+  const remainingMs = (ytDuration - currentTime) * 1000 + 3000;
+  if (remainingMs <= 0 || remainingMs > 12 * 3600 * 1000) return;
+  const token = ytLoadToken;
+  ytEndTimer = window.setTimeout(() => {
+    if (token !== ytLoadToken || ytIsPaused || ytEndedToken === token) return;
+    ytEndedToken = token;
+    ytPlayNext();
+  }, remainingMs);
 }
 
 function playYtVideo(id: string, title: string, ch: string, startSec = 0) {
   if (!activeYtIframe) return;
   ytCurrentIdx = ytPlaylist.findIndex(v => v.id === id);
   const startParam = startSec > 0 ? `&start=${Math.floor(startSec)}` : '';
-  activeYtIframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1${startParam}`;
+  ytLoadToken++;
+  ytDuration = 0;
+  clearTimeout(ytEndTimer);
+  // NOTE: deliberately no `origin=` param. The service worker rewrites the request's
+  // Origin header to https://www.youtube.com, so a chrome-extension:// origin param
+  // contradicts it and the player silently refuses to post events back. Without the
+  // param, the player replies to whoever sent the `listening` handshake — which is us.
+  activeYtIframe.src =
+    `https://www.youtube-nocookie.com/embed/${id}` +
+    `?autoplay=1&rel=0&enablejsapi=1&widgetid=1${startParam}`;
+  ytBindIframe(activeYtIframe);
+  void loadYtDurationFallback(id, ytLoadToken);
   ytPlayStartedAt = Date.now() - startSec * 1000;
   ytIsPaused = false;
   setYtBlockedBanner(false);
   updateNowPlayingView(id, title, ch);
   updatePausePlayUI();
   markActiveCard(id);
-  const elapsedReset = document.getElementById('yt-elapsed');
-  if (elapsedReset) elapsedReset.textContent = startSec > 0 ? `${Math.floor(startSec / 60)}:${String(Math.floor(startSec % 60)).padStart(2, '0')}` : '0:00';
+  if (!ytElapsedEl) ytElapsedEl = document.getElementById('yt-elapsed');
+  renderYtElapsed(startSec);
   switchYtPane('nowplaying');
   if (ytShuffle) rebuildShuffled();
   if (activeYtUpdateFn) activeYtUpdateFn(title);
@@ -2324,32 +2762,88 @@ function ytPlayPrev() {
 }
 
 // Auto-advance + pause/play state tracking
+function handleYtPlayerState(state: number) {
+  if (state === 0) {
+    // ENDED — dedupe: it can arrive via both onStateChange and infoDelivery
+    if (ytEndedToken === ytLoadToken) return;
+    ytEndedToken = ytLoadToken;
+    clearTimeout(ytEndTimer);
+    ytPlayNext();
+  } else if (state === 2) {
+    ytIsPaused = true;
+    clearTimeout(ytEndTimer);
+    ytPausedPosition = Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
+    updatePausePlayUI();
+    void getYtPlayState().then(s => { if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition: ytPausedPosition }); });
+  } else if (state === 1 || state === 3) {
+    ytApplyVolume();          // re-assert on play/buffer — a new video resets to 100%
+    if (state === 3) return;  // buffering: nothing else to update
+    ytIsPaused = false;
+    ytErrorSkips = 0;         // something is actually playing
+    setYtBlockedBanner(false);
+    if (ytPausedPosition > 0) ytPlayStartedAt = Date.now() - ytPausedPosition * 1000;
+    ytPausedPosition = 0;
+    updatePausePlayUI();
+    scheduleYtEndFallback(Math.max(0, (Date.now() - ytPlayStartedAt) / 1000));
+    void getYtPlayState().then(s => {
+      if (s) void saveYtPlayState({ ...s, isPaused: false, pausedPosition: 0, startedAt: ytPlayStartedAt });
+    });
+  }
+}
+
 window.addEventListener('message', (e) => {
-  if (e.origin !== 'https://www.youtube-nocookie.com') return;
-  try {
-    const data = JSON.parse(e.data as string);
-    if (data.event === 'onError') {
-      setYtBlockedBanner(true);
-      return;
+  if (e.origin !== 'https://www.youtube-nocookie.com' && e.origin !== 'https://www.youtube.com') return;
+  let data: any;
+  try { data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+  if (!data || typeof data !== 'object') return;
+
+  if (!ytApiBound) {
+    ytApiBound = true; // the player is talking to us — stop the handshake retries
+    ytApplyVolume();   // a fresh iframe always starts at 100%
+  }
+
+  if (data.event === 'onError' || data.event === 'onPlayerError') {
+    // 100 = removed/private, 101 & 150 = owner disabled embedding (very common for
+    // official music videos and YouTube Music tracks). Nothing will ever play here.
+    const code = Number(data.info?.errorCode ?? data.info);
+    const notEmbeddable = code === 101 || code === 150;
+    setYtBlockedBanner(true,
+      notEmbeddable
+        ? "This video's owner doesn't allow playback on other sites. Open it on YouTube, or pick another track."
+        : code === 100
+          ? 'This video is unavailable (removed or private).'
+          : undefined);
+    if ((code === 100 || notEmbeddable)) {
+      if (activeYtId) { ytBlockedIds.add(activeYtId); void addYtBlockedId(activeYtId); markBlockedCards(); }
+      // Skip forward once per track, so a fully blocked network can't race
+      // through the entire playlist.
+      // Stop skipping after a few failures in a row — otherwise a network that blocks
+      // every embed would cycle the playlist forever.
+      if (ytErrorSkipToken !== ytLoadToken && ytErrorSkips < 4) {
+        ytErrorSkipToken = ytLoadToken;
+        ytErrorSkips++;
+        setTimeout(() => ytPlayNext(), 2000);
+      }
     }
-    if (data.event !== 'onStateChange') return;
-    if (data.info === 0) {
-      ytPlayNext();
-    } else if (data.info === 2) {
-      ytIsPaused = true;
-      ytPausedPosition = Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
-      updatePausePlayUI();
-      void getYtPlayState().then(s => { if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition: ytPausedPosition }); });
-    } else if (data.info === 1) {
-      ytIsPaused = false;
-      ytPlayStartedAt = Date.now() - ytPausedPosition * 1000;
-      ytPausedPosition = 0;
-      updatePausePlayUI();
-      void getYtPlayState().then(s => {
-        if (s) void saveYtPlayState({ ...s, isPaused: false, pausedPosition: 0, startedAt: ytPlayStartedAt });
-      });
+    return;
+  }
+
+  if (data.event === 'infoDelivery' && data.info && typeof data.info === 'object') {
+    const info = data.info;
+    if (typeof info.duration === 'number' && info.duration > 0) ytDuration = info.duration;
+    if (typeof info.currentTime === 'number' && info.currentTime >= 0) {
+      // Trust the player's clock over wall-clock time (survives buffering + throttling)
+      if (!ytIsPaused) {
+        ytPlayStartedAt = Date.now() - info.currentTime * 1000;
+        renderYtElapsed(info.currentTime);
+        scheduleYtEndFallback(info.currentTime);
+      }
     }
-  } catch { /* non-JSON */ }
+    if (typeof info.playerState === 'number') handleYtPlayerState(info.playerState);
+    return;
+  }
+
+  if (data.event === 'onStateChange') handleYtPlayerState(Number(data.info));
 });
 
 async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void) {
@@ -2366,36 +2860,73 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   const ytGrid      = document.getElementById('yt-grid')         as HTMLElement;
   const elapsedEl   = document.getElementById('yt-elapsed')      as HTMLElement;
 
-  // Elapsed time ticker
-  function fmtTime(sec: number): string {
-    const s = Math.floor(Math.max(0, sec));
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  }
+  // Elapsed time ticker (infoDelivery keeps ytPlayStartedAt in sync with the real player clock)
+  ytElapsedEl = elapsedEl;
   setInterval(() => {
     if (!activeYtId || ytIsPaused || !elapsedEl) return;
-    elapsedEl.textContent = fmtTime((Date.now() - ytPlayStartedAt) / 1000);
+    renderYtElapsed((Date.now() - ytPlayStartedAt) / 1000);
   }, 1000);
 
   // Seek helpers using YouTube iframe postMessage API
+  function ytCurrentPos(): number {
+    return ytIsPaused ? ytPausedPosition : Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
+  }
   function ytSeekBy(deltaSec: number) {
-    if (!activeYtIframe || !activeYtId) return;
-    // Guard: iframe not yet loaded (e.g. restored paused state) — origin mismatch would occur
-    if (!activeYtIframe.src.includes('youtube-nocookie.com')) return;
-    const current = ytIsPaused
-      ? ytPausedPosition
-      : Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
-    const newPos = Math.max(0, current + deltaSec);
-    activeYtIframe.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func: 'seekTo', args: [newPos, true] }),
-      '*'
-    );
-    if (!ytIsPaused) {
-      ytPlayStartedAt = Date.now() - newPos * 1000;
-      if (elapsedEl) elapsedEl.textContent = fmtTime(newPos);
-    }
+    ytSeekTo(ytCurrentPos() + deltaSec);
   }
   document.getElementById('yt-seek-back')?.addEventListener('click', () => ytSeekBy(-15));
   document.getElementById('yt-seek-fwd')?.addEventListener('click',  () => ytSeekBy(+15));
+
+  // ── Scrub bar: click or drag anywhere on the track to jump ──
+  ytScrubEl    = document.getElementById('yt-scrub');
+  ytScrubFill  = document.getElementById('yt-scrub-fill');
+  ytScrubKnob  = document.getElementById('yt-scrub-knob');
+  ytScrubTip   = document.getElementById('yt-scrub-tip');
+  ytDurationEl = document.getElementById('yt-duration');
+
+  function scrubRatioFrom(clientX: number): number {
+    const r = ytScrubEl!.getBoundingClientRect();
+    if (r.width <= 0) return 0;
+    return Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+  }
+  function previewScrub(ratio: number) {
+    ytScrubRatio = ratio;
+    const sec = ratio * ytDuration;
+    setScrubVisual(ratio);
+    if (ytElapsedEl) ytElapsedEl.textContent = ytFmtTime(sec);
+    if (ytScrubTip) ytScrubTip.textContent = ytFmtTime(sec);
+  }
+
+  ytScrubEl?.addEventListener('pointerdown', (e) => {
+    if (!activeYtId || ytDuration <= 0) return;
+    e.preventDefault();
+    ytScrubbing = true;
+    ytScrubEl!.classList.add('yt-scrub--dragging');
+    ytScrubEl!.setPointerCapture(e.pointerId);
+    previewScrub(scrubRatioFrom(e.clientX));
+  });
+  ytScrubEl?.addEventListener('pointermove', (e) => {
+    if (!ytScrubbing) return;
+    previewScrub(scrubRatioFrom(e.clientX));
+  });
+  function endScrub(commit: boolean) {
+    if (!ytScrubbing) return;
+    ytScrubbing = false;
+    ytScrubEl?.classList.remove('yt-scrub--dragging');
+    if (commit) ytSeekTo(ytScrubRatio * ytDuration);
+    else renderYtElapsed(ytCurrentPos());
+  }
+  ytScrubEl?.addEventListener('pointerup', () => endScrub(true));
+  ytScrubEl?.addEventListener('pointercancel', () => endScrub(false));
+
+  // Keyboard access: ←/→ nudge 5s, Home/End jump to start/end
+  ytScrubEl?.addEventListener('keydown', (e) => {
+    if (!activeYtId || ytDuration <= 0) return;
+    if (e.key === 'ArrowLeft')       { e.preventDefault(); e.stopPropagation(); ytSeekBy(-5); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); ytSeekBy(+5); }
+    else if (e.key === 'Home')       { e.preventDefault(); ytSeekTo(0); }
+    else if (e.key === 'End')        { e.preventDefault(); ytSeekTo(ytDuration - 5); }
+  });
 
   // "Browse Library" button in empty state
   document.querySelector<HTMLButtonElement>('.yt-np-empty-btn')?.addEventListener('click', () => {
@@ -2403,6 +2934,7 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   });
 
   let customVideos = await getCustomYtVideos();
+  (await getYtBlockedIds()).forEach(id => ytBlockedIds.add(id));
 
   function rebuildPlaylist() {
     ytPlaylist = [
@@ -2438,6 +2970,7 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
       ytGrid.appendChild(buildYtCard(v.id, v.title, v.ch, false, (id, t, ch) => playYtVideo(id, t, ch)));
     });
     rebuildPlaylist();
+    markBlockedCards();
     if (activeYtId) markActiveCard(activeYtId);
   }
 
@@ -2478,7 +3011,7 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     await saveCustomYtVideos(customVideos);
     btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add`;
     btn.disabled = false; input.value = '';
-    if (!embeddable) embedWarning.classList.remove('hidden');
+    if (!embeddable || ytBlockedIds.has(id)) embedWarning.classList.remove('hidden');
     rebuildPlaylist(); renderGrid();
   });
 
@@ -2499,7 +3032,12 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
     if (ytIsPaused) {
       // Save paused position immediately so other tabs can read it right away
       ytPausedPosition = Math.max(0, (Date.now() - ytPlayStartedAt) / 1000);
+      clearTimeout(ytEndTimer); // don't auto-advance while paused
       void getYtPlayState().then(s => { if (s) void saveYtPlayState({ ...s, isPaused: true, pausedPosition: ytPausedPosition }); });
+    } else {
+      ytPlayStartedAt = Date.now() - ytPausedPosition * 1000;
+      ytPausedPosition = 0;
+      scheduleYtEndFallback(Math.max(0, (Date.now() - ytPlayStartedAt) / 1000));
     }
     updatePausePlayUI();
   });
@@ -2582,170 +3120,42 @@ async function initYouTubeBeats(updateNowPlaying: (label: string | null) => void
   });
 }
 
-// ─── Habit Tracker ────────────────────────────────────────────────────────────
+// ─── Tab Sessions ──────────────────────────────────────────────────────────────
 
-async function initHabits() {
-  const panel = document.getElementById('habits-panel') as HTMLElement;
-  const list  = document.getElementById('habit-list') as HTMLUListElement;
-  const empty = document.getElementById('habit-empty') as HTMLElement;
-  const form  = document.getElementById('habit-add-form') as HTMLFormElement;
-  const emojiInput = document.getElementById('habit-emoji-input') as HTMLInputElement;
-  const labelInput = document.getElementById('habit-label-input') as HTMLInputElement;
-  const dateEl = document.getElementById('habit-date') as HTMLElement;
+/**
+ * Reopen a saved session in its own window, preserving order and pinned tabs.
+ * Tabs past the first are created inactive and then discarded, so restoring a
+ * 30-tab session doesn't try to load 30 pages at once.
+ */
+async function restoreSession(session: TabSession): Promise<void> {
+  const tabs = session.tabs;
+  let win: chrome.windows.Window | undefined;
+  try {
+    win = await chrome.windows.create({ url: tabs[0].url, focused: true });
+  } catch {
+    // Window creation blocked — fall back to opening in the current window
+    tabs.forEach(t => chrome.tabs.create({ url: t.url, active: false }));
+    return;
+  }
+  const windowId = win?.id;
+  if (windowId === undefined) return;
 
-  const today = todayString();
-  dateEl.textContent = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-
-  let habits = await getHabits();
-  let log = await getTodayHabitLog();
-
-  async function renderHabits() {
-    habits = await getHabits();
-    log = await getTodayHabitLog();
-    list.innerHTML = '';
-    empty.classList.toggle('hidden', habits.length > 0);
-
-    for (const habit of habits) {
-      const streak = await getHabitStreak(habit.id);
-      const done = !!log.done[habit.id];
-
-      const li = document.createElement('li');
-      li.className = 'habit-item' + (done ? ' habit-done' : '');
-
-      const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.className = 'habit-cb'; cb.checked = done;
-      cb.addEventListener('change', async () => {
-        log.done[habit.id] = cb.checked;
-        await saveHabitLog({ date: today, done: log.done });
-        li.classList.toggle('habit-done', cb.checked);
-        streakEl.textContent = cb.checked ? String(streak + 1) + '🔥' : (streak > 0 ? String(streak) + '🔥' : '');
-      });
-
-      const emoji = document.createElement('span');
-      emoji.className = 'habit-emoji'; emoji.textContent = habit.emoji || '🎯';
-
-      const label = document.createElement('span');
-      label.className = 'habit-label'; label.textContent = habit.label;
-
-      const streakEl = document.createElement('span');
-      streakEl.className = 'habit-streak';
-      streakEl.textContent = streak > 0 ? String(streak) + '🔥' : '';
-
-      const del = document.createElement('button');
-      del.className = 'habit-del'; del.title = 'Remove'; del.textContent = '✕';
-      del.addEventListener('click', async () => {
-        habits = habits.filter(h => h.id !== habit.id);
-        await saveHabits(habits);
-        renderHabits();
-      });
-
-      li.append(cb, emoji, label, streakEl, del);
-      list.appendChild(li);
-    }
+  if (tabs[0].pinned && win?.tabs?.[0]?.id !== undefined) {
+    try { await chrome.tabs.update(win.tabs[0].id!, { pinned: true }); } catch { /* ignore */ }
   }
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const label = labelInput.value.trim();
-    if (!label) return;
-    const habit: Habit = { id: Date.now().toString(), label, emoji: emojiInput.value.trim() || '🎯' };
-    habits.push(habit);
-    await saveHabits(habits);
-    labelInput.value = ''; emojiInput.value = '';
-    renderHabits();
-  });
-
-  document.getElementById('btn-habits-toggle')?.addEventListener('click', () => {
-    panel.classList.toggle('hidden');
-    if (!panel.classList.contains('hidden')) renderHabits();
-  });
-  document.getElementById('btn-habits-close')?.addEventListener('click', () => panel.classList.add('hidden'));
-
-  await renderHabits();
+  for (let i = 1; i < tabs.length; i++) {
+    try {
+      const created = await chrome.tabs.create({
+        windowId, url: tabs[i].url, index: i, active: false, pinned: tabs[i].pinned === true,
+      });
+      // Unload it immediately; Chrome reloads on first view
+      if (created.id !== undefined && tabs.length > 6) {
+        setTimeout(() => { try { void chrome.tabs.discard(created.id!); } catch { /* ignore */ } }, 1500);
+      }
+    } catch { /* a single bad URL shouldn't abort the rest of the restore */ }
+  }
 }
-
-// ─── Daily Journal ─────────────────────────────────────────────────────────────
-
-const JOURNAL_PROMPTS = [
-  'What are you grateful for today?',
-  'What\'s one thing you want to accomplish today?',
-  'What did you learn yesterday?',
-  'What\'s challenging you right now?',
-  'What made you smile recently?',
-  'What are you looking forward to?',
-  'What would make today a success?',
-  'How are you feeling right now?',
-  'What\'s your biggest priority this week?',
-  'Describe a recent win, big or small.',
-  'What habit do you want to build?',
-  'What\'s one thing you could do differently today?',
-  'Who has positively influenced you lately?',
-  'What do you need to let go of?',
-  'What excites you about your work right now?',
-  'What\'s one thing you\'re proud of this week?',
-  'How are you taking care of yourself today?',
-  'What\'s a goal you\'ve been putting off?',
-  'What would your future self thank you for today?',
-  'What\'s the best thing that happened recently?',
-];
-
-function getTodayPrompt(): string {
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  return JOURNAL_PROMPTS[dayOfYear % JOURNAL_PROMPTS.length]!;
-}
-
-async function initJournal() {
-  const panel    = document.getElementById('journal-panel') as HTMLElement;
-  const promptEl = document.getElementById('journal-prompt') as HTMLElement;
-  const textarea = document.getElementById('journal-textarea') as HTMLTextAreaElement;
-  const badge    = document.getElementById('journal-saved-badge') as HTMLElement;
-  const histBtn  = document.getElementById('btn-journal-history') as HTMLButtonElement;
-  const histEl   = document.getElementById('journal-history') as HTMLElement;
-
-  const today  = todayString();
-  const prompt = getTodayPrompt();
-  promptEl.textContent = prompt;
-
-  // Load today's entry if it exists
-  const entries = await getJournalEntries();
-  const todayEntry = entries.find(e => e.date === today);
-  if (todayEntry) textarea.value = todayEntry.text;
-
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  textarea.addEventListener('input', () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    badge.classList.add('hidden');
-    saveTimer = setTimeout(async () => {
-      await saveJournalEntry({ date: today, prompt, text: textarea.value });
-      badge.classList.remove('hidden');
-      setTimeout(() => badge.classList.add('hidden'), 2000);
-    }, 800);
-  });
-
-  histBtn.addEventListener('click', async () => {
-    const open = !histEl.classList.contains('hidden');
-    histEl.classList.toggle('hidden', open);
-    histBtn.textContent = open ? 'Past entries ▾' : 'Past entries ▴';
-    if (!open) {
-      const all = (await getJournalEntries()).filter(e => e.date !== today).reverse().slice(0, 30);
-      histEl.innerHTML = all.length === 0
-        ? '<p class="journal-hist-empty">No past entries yet.</p>'
-        : all.map(e => `
-            <div class="journal-hist-entry">
-              <div class="journal-hist-date">${e.date}</div>
-              <div class="journal-hist-prompt">${e.prompt}</div>
-              <div class="journal-hist-text">${e.text || '<em>No entry</em>'}</div>
-            </div>`).join('');
-    }
-  });
-
-  document.getElementById('btn-journal-toggle')?.addEventListener('click', () => {
-    panel.classList.toggle('hidden');
-  });
-  document.getElementById('btn-journal-close')?.addEventListener('click', () => panel.classList.add('hidden'));
-}
-
-// ─── Tab Sessions ──────────────────────────────────────────────────────────────
 
 async function initTabSessions() {
   const panel = document.getElementById('sessions-panel') as HTMLElement;
@@ -2777,8 +3187,8 @@ async function initTabSessions() {
         const id = btn.dataset['id']!;
         const sessions = await getTabSessions();
         const session = sessions.find(s => s.id === id);
-        if (!session) return;
-        session.tabs.forEach(t => chrome.tabs.create({ url: t.url }));
+        if (!session || !session.tabs.length) return;
+        await restoreSession(session);
       });
     });
 
@@ -2800,19 +3210,46 @@ async function initTabSessions() {
 
   document.getElementById('btn-sessions-close')?.addEventListener('click', () => panel.classList.remove('open'));
 
+  // URLs no extension may reopen — saving them would only produce dead tabs
+  const UNRESTORABLE = /^(chrome|chrome-extension|edge|about|devtools|view-source|file):/i;
+
   document.getElementById('btn-sessions-save')?.addEventListener('click', async () => {
+    // `tabs` is an optional permission, so ask for it before anything else in this
+    // handler — chrome.permissions.request() must run inside the user gesture, and a
+    // prompt() beforehand would consume it. Resolves immediately if already granted.
+    let granted = false;
+    try { granted = await chrome.permissions.request({ permissions: ['tabs'] }); }
+    catch { granted = false; }
+    if (!granted) {
+      alert('MonkTab needs permission to read your tabs in order to save a session.\n\n'
+          + 'Without it Chrome hides tab URLs, and only a handful of tabs can be saved.');
+      return;
+    }
+
     const name = prompt('Session name:', `Session ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}`)?.trim();
     if (!name) return;
+
     const tabs = await chrome.tabs.query({ currentWindow: true });
+    const saved = tabs
+      .filter(t => t.url && !UNRESTORABLE.test(t.url))
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))   // preserve left-to-right order
+      .map(t => ({
+        title: t.title ?? t.url ?? '',
+        url: t.url!,
+        favicon: t.favIconUrl,
+        pinned: t.pinned === true,
+      }));
+
+    if (!saved.length) {
+      alert('No restorable tabs in this window — browser and extension pages cannot be reopened.');
+      return;
+    }
+
     const session: TabSession = {
       id: `sess_${Date.now()}`,
       name,
       savedAt: Date.now(),
-      tabs: tabs.filter(t => t.url && !t.url.startsWith('chrome://')).map(t => ({
-        title: t.title ?? t.url ?? '',
-        url: t.url!,
-        favicon: t.favIconUrl,
-      })),
+      tabs: saved,
     };
     const sessions = await getTabSessions();
     sessions.unshift(session);
@@ -2837,8 +3274,6 @@ function initKeyboardShortcuts() {
       switch (e.key.toLowerCase()) {
         case 'n': e.preventDefault(); document.getElementById('btn-notes-toggle')?.click(); break;
         case 'p': e.preventDefault(); document.getElementById('btn-pomo-toggle')?.click(); break;
-        case 'h': e.preventDefault(); document.getElementById('btn-habits-toggle')?.click(); break;
-        case 'j': e.preventDefault(); document.getElementById('btn-journal-toggle')?.click(); break;
         case 'l': e.preventDefault(); document.getElementById('btn-links-toggle')?.click(); break;
         case 'm': e.preventDefault(); document.getElementById('btn-sound-toggle')?.click(); break;
         case 's': e.preventDefault(); document.getElementById('btn-sessions-toggle')?.click(); break;
@@ -2850,7 +3285,7 @@ function initKeyboardShortcuts() {
     if (e.key === 'Escape') {
       shortcutsModal.classList.add('hidden');
       // Close any open panel
-      document.querySelectorAll('.notes-panel.open, .links-panel.open, .habits-panel.open, .journal-panel.open, .sessions-panel.open').forEach(p => p.classList.remove('open'));
+      document.querySelectorAll('.notes-panel.open, .links-panel.open, .sessions-panel.open').forEach(p => p.classList.remove('open'));
       document.getElementById('news-panel')?.classList.remove('open');
     }
   });
@@ -2863,16 +3298,16 @@ function initKeyboardShortcuts() {
 
 function initExportData() {
   document.getElementById('btn-export-data')?.addEventListener('click', async () => {
-    const [todos, links, folders, notes, journal, habits, countdowns, sessions, settings] = await Promise.all([
+    const [todos, links, folders, notes, countdowns, sessions, settings] = await Promise.all([
       getTodos(), getLinks(), getFolders(), getNotesList(),
-      getJournalEntries(), getHabits(), getCountdowns(),
+      getCountdowns(),
       getTabSessions(), getSettings(),
     ]);
     const data = {
       exportedAt: new Date().toISOString(),
       version: '1.0',
       settings: { name: settings.name, theme: settings.theme },
-      todos, links, folders, notes, journal, habits, countdowns, sessions,
+      todos, links, folders, notes, countdowns, sessions,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -3226,7 +3661,9 @@ function initFocusMode() {
   // Volume slider synced with main slider
   fmVol.value = (document.getElementById('sound-volume') as HTMLInputElement)?.value ?? '50';
   fmVol.addEventListener('input', () => {
-    setSoundVolume(parseInt(fmVol.value, 10));
+    const v = parseInt(fmVol.value, 10);
+    setSoundVolume(v);
+    ytSetVolume(v);
     const mainSlider = document.getElementById('sound-volume') as HTMLInputElement;
     if (mainSlider) mainSlider.value = fmVol.value;
   });
@@ -3238,6 +3675,7 @@ function initFocusMode() {
       const chip2 = document.createElement('button');
       chip2.className = `sv-chip${fmActiveVariant === v.id ? ' active' : ''}`;
       chip2.textContent = v.label;
+      chip2.addEventListener('mouseenter', () => preloadSoundscape(v.id), { once: true });
       chip2.addEventListener('click', () => {
         if (fmActiveVariant === v.id) {
           // Toggle off
@@ -3332,15 +3770,22 @@ function initFocusMode() {
       fmYtPlayer.classList.remove('hidden');
       fmYtTitle.textContent = `${title} · ${ch}`;
       fmYtOpen.href = `https://www.youtube.com/watch?v=${id}`;
-      fmYtIframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&enablejsapi=1`;
       fmSoundInfo = { label: title, variantId: `yt-${id}` };
       updateFmSoundChip();
-      // Sync with shared playlist state
+      // Route playback through the shared player so the focus-mode iframe also gets
+      // the IFrame API handshake — without it tracks never auto-advance here either.
       activeYtIframe = fmYtIframe;
       activeYtUpdateFn = (label) => {
-        if (label) { fmSoundInfo = { label, variantId: `yt-active` }; updateFmSoundChip(); }
+        if (label) {
+          fmSoundInfo = { label, variantId: `yt-active` };
+          updateFmSoundChip();
+          const cur = ytPlaylist[ytCurrentIdx];
+          fmYtTitle.textContent = cur ? `${cur.title} · ${cur.ch}` : label;
+          if (cur) fmYtOpen.href = `https://www.youtube.com/watch?v=${cur.id}`;
+        }
       };
-      ytCurrentIdx = ytPlaylist.findIndex(v => v.id === id);
+      if (!ytPlaylist.length) ytPlaylist = [...YT_VIDEOS];
+      playYtVideo(id, title, ch);
     }
 
     if (customVideos.length > 0) {
@@ -3459,6 +3904,147 @@ function initVisionBoard(settings: Settings) {
 }
 
 // ─── World Clocks settings ────────────────────────────────────────────────────
+
+// ─── Timezone search picker ───────────────────────────────────────────────────
+
+/** Current wall-clock time in a zone, for the preview column. */
+function tzNow(tz: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date());
+  } catch { return '--:--'; }
+}
+
+/** UTC offset like "+5:30", computed live so it follows daylight saving. */
+function tzOffset(tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+      .formatToParts(new Date());
+    const name = parts.find(p => p.type === 'timeZoneName')?.value ?? '';
+    return name.replace('GMT', 'UTC').replace(/UTC([+-])0?(\d)/, 'UTC$1$2') || 'UTC';
+  } catch { return ''; }
+}
+
+/**
+ * Rank a zone against the query. Lower score is better; -1 means no match.
+ * Prefix matches beat substring matches, and city beats country beats zone id.
+ * When the hit came from an alias, that alias becomes the display name — someone
+ * typing "Bangalore" should see Bangalore, not the zone's name of Kolkata.
+ */
+function tzMatch(e: TzEntry, q: string): TzHit | null {
+  const label = e.label.toLowerCase();
+  const country = e.country.toLowerCase();
+  const hit = (score: number, display = e.label): TzHit => ({ e, display, score });
+
+  if (label === q) return hit(0);
+  if (country === q) return hit(0.2);
+  for (const a of e.aliases) {
+    const al = a.toLowerCase();
+    if (al === q) return hit(0.1, a);
+    if (al.startsWith(q)) return hit(1.5, a);
+  }
+  if (label.startsWith(q)) return hit(1);
+  if (country.startsWith(q)) return hit(2);
+  if (label.includes(q)) return hit(3);
+  for (const a of e.aliases) if (a.toLowerCase().includes(q)) return hit(4, a);
+  if (country.includes(q)) return hit(5);
+  if (e.tz.toLowerCase().replace(/_/g, ' ').includes(q)) return hit(6);
+  return null;
+}
+
+function tzSearch(query: string): TzHit[] {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return POPULAR_TZ
+      .map(tz => TIMEZONES.find(e => e.tz === tz))
+      .filter((e): e is TzEntry => !!e)
+      .map(e => ({ e, display: e.label, score: 0 }));
+  }
+  return TIMEZONES
+    .map(e => tzMatch(e, q))
+    .filter((r): r is TzHit => r !== null)
+    .sort((a, b) => a.score - b.score || a.display.localeCompare(b.display))
+    .slice(0, 60);
+}
+
+/** Wire the type-to-search timezone picker. `onPick` receives the chosen zone. */
+function initTzPicker(onPick: (label: string, tz: string) => void) {
+  const input   = document.getElementById('tz-search') as HTMLInputElement | null;
+  const results = document.getElementById('tz-results') as HTMLElement | null;
+  const clearBtn = document.getElementById('tz-clear') as HTMLButtonElement | null;
+  if (!input || !results) return;
+
+  let active = -1;
+  let shown: TzHit[] = [];
+
+  const close = () => {
+    results.classList.add('hidden');
+    input.setAttribute('aria-expanded', 'false');
+    active = -1;
+  };
+
+  function paint() {
+    shown = tzSearch(input!.value);
+    if (!shown.length) {
+      results!.innerHTML = `<div class="tz-no-result">No city or country matches “${newsEscape(input!.value)}”</div>`;
+    } else {
+      const heading = input!.value.trim() ? '' : '<div class="tz-group">Popular</div>';
+      results!.innerHTML = heading + shown.map(({ e, display }, i) => `
+        <button class="tz-row${i === active ? ' tz-row--active' : ''}" role="option"
+                data-i="${i}" type="button" aria-selected="${i === active}">
+          <span class="tz-flag">${countryFlag(e.cc)}</span>
+          <span class="tz-names">
+            <span class="tz-city">${newsEscape(display)}</span>
+            <span class="tz-country">${newsEscape(e.country)} · ${newsEscape(tzOffset(e.tz))}</span>
+          </span>
+          <span class="tz-time">${tzNow(e.tz)}</span>
+        </button>`).join('');
+    }
+    results!.classList.remove('hidden');
+    input!.setAttribute('aria-expanded', 'true');
+    clearBtn?.classList.toggle('hidden', !input!.value);
+  }
+
+  function choose(i: number) {
+    const hit = shown[i];
+    if (!hit) return;
+    onPick(hit.display, hit.e.tz);   // label the clock with the name they typed
+    input!.value = '';
+    close();
+    clearBtn?.classList.add('hidden');
+  }
+
+  function moveActive(delta: number) {
+    if (!shown.length) return;
+    active = (active + delta + shown.length) % shown.length;
+    results!.querySelectorAll<HTMLElement>('.tz-row').forEach((el, i) => {
+      el.classList.toggle('tz-row--active', i === active);
+      el.setAttribute('aria-selected', String(i === active));
+      if (i === active) el.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  input.addEventListener('input', () => { active = -1; paint(); });
+  input.addEventListener('focus', paint);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowDown')      { ev.preventDefault(); moveActive(1); }
+    else if (ev.key === 'ArrowUp')   { ev.preventDefault(); moveActive(-1); }
+    else if (ev.key === 'Enter')     { ev.preventDefault(); choose(active >= 0 ? active : 0); }
+    else if (ev.key === 'Escape')    { close(); input.blur(); }
+  });
+  results.addEventListener('mousedown', (ev) => {
+    // mousedown, not click — the input's blur would tear the list down first
+    const row = (ev.target as HTMLElement).closest<HTMLElement>('.tz-row');
+    if (!row) return;
+    ev.preventDefault();
+    choose(Number(row.dataset['i']));
+  });
+  clearBtn?.addEventListener('click', () => { input.value = ''; input.focus(); paint(); });
+  document.addEventListener('click', (ev) => {
+    if (!input.contains(ev.target as Node) && !results.contains(ev.target as Node)) close();
+  });
+}
 
 function renderClocksConfig(clocks: WorldClock[]) {
   const container = document.getElementById('clocks-config') as HTMLElement;
@@ -3635,8 +4221,6 @@ function initSettingsPanel(settings: Settings) {
   (document.getElementById('set-countdowns') as HTMLInputElement).checked = settings.showCountdowns;
   (document.getElementById('set-github') as HTMLInputElement).checked = settings.showGithub;
   (document.getElementById('set-ai') as HTMLInputElement).checked = settings.showAi;
-  (document.getElementById('set-habits') as HTMLInputElement).checked = settings.showHabits;
-  (document.getElementById('set-journal') as HTMLInputElement).checked = settings.showJournal;
 
   (document.getElementById('set-unsplash') as HTMLInputElement).value = settings.unsplashKey;
   (document.getElementById('set-gh-user') as HTMLInputElement).value = settings.githubUsername;
@@ -3658,12 +4242,10 @@ function initSettingsPanel(settings: Settings) {
   const clonedClocks = settings.worldClocks.map(c => ({ ...c }));
   renderClocksConfig(clonedClocks);
 
-  document.getElementById('tz-preset')?.addEventListener('change', (e) => {
-    const val = (e.target as HTMLSelectElement).value;
-    if (!val) return;
-    const [label, timezone] = val.split('|');
-    if (label && timezone) { clonedClocks.push({ label, timezone }); renderClocksConfig(clonedClocks); }
-    (e.target as HTMLSelectElement).value = '';
+  initTzPicker((label, timezone) => {
+    if (clonedClocks.some(c => c.timezone === timezone && c.label === label)) return; // already added
+    clonedClocks.push({ label, timezone });
+    renderClocksConfig(clonedClocks);
   });
 
   initVisionBoard(settings);
@@ -3682,8 +4264,6 @@ function initSettingsPanel(settings: Settings) {
       showCountdowns: (document.getElementById('set-countdowns') as HTMLInputElement).checked,
       showGithub: (document.getElementById('set-github') as HTMLInputElement).checked,
       showAi: (document.getElementById('set-ai') as HTMLInputElement).checked,
-      showHabits: (document.getElementById('set-habits') as HTMLInputElement).checked,
-      showJournal: (document.getElementById('set-journal') as HTMLInputElement).checked,
       quoteCategory: (document.getElementById('set-quote-cat') as HTMLSelectElement).value as 'motivation' | 'stoic' | 'tech' | 'random',
       unsplashKey: (document.getElementById('set-unsplash') as HTMLInputElement).value.trim(),
       githubUsername: (document.getElementById('set-gh-user') as HTMLInputElement).value.trim(),
@@ -3723,8 +4303,6 @@ function applyVisibility(s: Settings) {
   s.showAi ? show('btn-ai-toggle') : hide('btn-ai-toggle');
   s.showNotes ? show('btn-notes-toggle') : hide('btn-notes-toggle');
   s.showPomodoro ? show('pomodoro-panel') : hide('pomodoro-panel');
-  s.showHabits ? show('btn-habits-toggle') : hide('btn-habits-toggle');
-  s.showJournal ? show('btn-journal-toggle') : hide('btn-journal-toggle');
   if (!s.showLinks) hide('btn-links-toggle');
   if (s.showWorldClocks) show('world-clocks-bar'); else hide('world-clocks-bar');
 }
@@ -3776,8 +4354,6 @@ async function init() {
   initQuoteRefresh(settings.quoteCategory ?? 'motivation');
   initAI(settings.aiProvider);
   initSoundscapes();
-  await initHabits();
-  await initJournal();
   await initTabSessions();
   initKeyboardShortcuts();
   initExportData();

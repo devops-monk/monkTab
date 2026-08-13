@@ -10,8 +10,6 @@ export interface Settings {
   showCountdowns: boolean;
   showGithub: boolean;
   showAi: boolean;
-  showHabits: boolean;
-  showJournal: boolean;
   showCalendar: boolean;
   theme: 'auto' | 'light' | 'dark';
   unsplashKey: string;
@@ -36,7 +34,8 @@ export interface TabSession {
   id: string;
   name: string;
   savedAt: number;
-  tabs: { title: string; url: string; favicon?: string }[];
+  // Stored in left-to-right tab order. `pinned` is absent on sessions saved before 1.2.1.
+  tabs: { title: string; url: string; favicon?: string; pinned?: boolean }[];
 }
 
 export interface Note {
@@ -45,23 +44,6 @@ export interface Note {
   content: string;
   createdAt: number;
   updatedAt: number;
-}
-
-export interface Habit {
-  id: string;
-  label: string;
-  emoji: string;
-}
-
-export interface HabitLog {
-  date: string;           // YYYY-MM-DD
-  done: Record<string, boolean>; // habit id -> completed today
-}
-
-export interface JournalEntry {
-  date: string;    // YYYY-MM-DD
-  prompt: string;
-  text: string;
 }
 
 export interface Todo {
@@ -180,16 +162,14 @@ const DEFAULTS: Settings = {
   name: '',
   showWeather: true,
   showQuote: true,
-  showTodos: true,
+  showTodos: false,
   showLinks: true,
   showPomodoro: false,
-  showNotes: false,
-  showWorldClocks: false,
+  showNotes: true,
+  showWorldClocks: true,
   showCountdowns: false,
   showGithub: false,
   showAi: true,
-  showHabits: false,
-  showJournal: false,
   showCalendar: false,
   theme: 'dark',
   unsplashKey: '',
@@ -330,6 +310,31 @@ export async function saveCustomYtVideos(videos: CustomYtVideo[]): Promise<void>
   await chrome.storage.local.set({ mt_yt_custom: videos });
 }
 
+// Player volume (0–100), shared by soundscapes and the YouTube player.
+export async function getYtVolume(): Promise<number> {
+  const result = await chrome.storage.local.get('mt_yt_volume');
+  const v = result['mt_yt_volume'];
+  return typeof v === 'number' && v >= 0 && v <= 100 ? v : 50;
+}
+
+export async function saveYtVolume(v: number): Promise<void> {
+  await chrome.storage.local.set({ mt_yt_volume: Math.max(0, Math.min(100, Math.round(v))) });
+}
+
+// Video IDs the YouTube player has reported as un-embeddable (error 100/101/150).
+// Remembered so the UI can flag them instead of silently failing again.
+export async function getYtBlockedIds(): Promise<string[]> {
+  const result = await chrome.storage.local.get('mt_yt_blocked');
+  return (result['mt_yt_blocked'] as string[]) ?? [];
+}
+
+export async function addYtBlockedId(id: string): Promise<void> {
+  const ids = await getYtBlockedIds();
+  if (ids.includes(id)) return;
+  ids.push(id);
+  await chrome.storage.local.set({ mt_yt_blocked: ids.slice(-200) });
+}
+
 export interface WatchItem {
   id: string;
   symbol: string;            // display symbol, e.g. BTC, AAPL
@@ -351,66 +356,6 @@ export async function saveWatchlist(items: WatchItem[]): Promise<void> {
 
 export function todayString(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-// ─── Habits ───────────────────────────────────────────────────────────────────
-
-export async function getHabits(): Promise<Habit[]> {
-  const r = await chrome.storage.local.get('mt_habits');
-  return (r['mt_habits'] as Habit[]) ?? [];
-}
-
-export async function saveHabits(habits: Habit[]): Promise<void> {
-  await chrome.storage.local.set({ mt_habits: habits });
-}
-
-export async function getTodayHabitLog(): Promise<HabitLog> {
-  const today = todayString();
-  const r = await chrome.storage.local.get('mt_habit_logs');
-  const logs = (r['mt_habit_logs'] as HabitLog[]) ?? [];
-  return logs.find(l => l.date === today) ?? { date: today, done: {} };
-}
-
-export async function saveHabitLog(log: HabitLog): Promise<void> {
-  const r = await chrome.storage.local.get('mt_habit_logs');
-  const logs = (r['mt_habit_logs'] as HabitLog[]) ?? [];
-  const idx = logs.findIndex(l => l.date === log.date);
-  if (idx >= 0) logs[idx] = log; else logs.push(log);
-  // keep last 90 days
-  const recent = logs.sort((a, b) => a.date.localeCompare(b.date)).slice(-90);
-  await chrome.storage.local.set({ mt_habit_logs: recent });
-}
-
-export async function getHabitStreak(habitId: string): Promise<number> {
-  const r = await chrome.storage.local.get('mt_habit_logs');
-  const logs = ((r['mt_habit_logs'] as HabitLog[]) ?? [])
-    .sort((a, b) => b.date.localeCompare(a.date)); // newest first
-  const today = todayString();
-  let streak = 0;
-  let cursor = today;
-  for (const log of logs) {
-    if (log.date !== cursor) break;
-    if (log.done[habitId]) streak++;
-    else break;
-    const d = new Date(cursor); d.setDate(d.getDate() - 1);
-    cursor = d.toISOString().slice(0, 10);
-  }
-  return streak;
-}
-
-// ─── Journal ──────────────────────────────────────────────────────────────────
-
-export async function getJournalEntries(): Promise<JournalEntry[]> {
-  const r = await chrome.storage.local.get('mt_journal');
-  return (r['mt_journal'] as JournalEntry[]) ?? [];
-}
-
-export async function saveJournalEntry(entry: JournalEntry): Promise<void> {
-  const entries = await getJournalEntries();
-  const idx = entries.findIndex(e => e.date === entry.date);
-  if (idx >= 0) entries[idx] = entry; else entries.push(entry);
-  const recent = entries.sort((a, b) => a.date.localeCompare(b.date)).slice(-365);
-  await chrome.storage.local.set({ mt_journal: recent });
 }
 
 // ─── Tab Sessions ─────────────────────────────────────────────────────────────

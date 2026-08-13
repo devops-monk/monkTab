@@ -1,0 +1,187 @@
+{
+ "Australia/Sydney": [
+  "Melbourne",
+  "Canberra",
+  "Newcastle"
+ ],
+ "America/Sao_Paulo": [
+  "Rio de Janeiro",
+  "Brasilia",
+  "Belo Horizonte"
+ ],
+ "Europe/London": [
+  "Manchester",
+  "Birmingham",
+  "Edinburgh",
+  "Glasgow",
+  "Leeds",
+  "Cambridge",
+  "Oxford"
+ ],
+ "America/Toronto": [
+  "Montreal",
+  "Ottawa",
+  "Quebec"
+ ],
+ "Asia/Shanghai": [
+  "Beijing",
+  "Shenzhen",
+  "Guangzhou",
+  "Hangzhou",
+  "Chengdu"
+ ],
+ "Africa/Cairo": [
+  "Alexandria",
+  "Giza"
+ ],
+ "Europe/Paris": [
+  "Lyon",
+  "Marseille",
+  "Toulouse",
+  "Nice"
+ ],
+ "Europe/Berlin": [
+  "Munich",
+  "Frankfurt",
+  "Hamburg",
+  "Cologne",
+  "Stuttgart"
+ ],
+ "Asia/Kolkata": [
+  "Mumbai",
+  "Bangalore",
+  "Bengaluru",
+  "Delhi",
+  "New Delhi",
+  "Hyderabad",
+  "Chennai",
+  "Pune",
+  "Kochi",
+  "Ahmedabad",
+  "Jaipur",
+  "Noida",
+  "Gurgaon"
+ ],
+ "Asia/Jakarta": [
+  "Bandung",
+  "Surabaya"
+ ],
+ "Europe/Rome": [
+  "Milan",
+  "Naples",
+  "Turin",
+  "Florence",
+  "Venice"
+ ],
+ "Asia/Tokyo": [
+  "Osaka",
+  "Kyoto",
+  "Yokohama",
+  "Nagoya"
+ ],
+ "Asia/Seoul": [
+  "Busan",
+  "Incheon"
+ ],
+ "America/Mexico_City": [
+  "Guadalajara",
+  "Monterrey",
+  "Cancun"
+ ],
+ "Pacific/Auckland": [
+  "Wellington",
+  "Christchurch"
+ ],
+ "Africa/Lagos": [
+  "Abuja",
+  "Ibadan",
+  "Kano"
+ ],
+ "Asia/Karachi": [
+  "Lahore",
+  "Islamabad"
+ ],
+ "Asia/Manila": [
+  "Cebu",
+  "Quezon City",
+  "Davao"
+ ],
+ "Europe/Warsaw": [
+  "Krakow",
+  "Wroclaw",
+  "Gdansk"
+ ],
+ "Europe/Moscow": [
+  "Saint Petersburg",
+  "St Petersburg"
+ ],
+ "Asia/Riyadh": [
+  "Jeddah",
+  "Mecca",
+  "Medina"
+ ],
+ "Africa/Johannesburg": [
+  "Cape Town",
+  "Durban",
+  "Pretoria"
+ ],
+ "Europe/Madrid": [
+  "Barcelona",
+  "Valencia",
+  "Seville"
+ ],
+ "Asia/Bangkok": [
+  "Phuket",
+  "Chiang Mai"
+ ],
+ "Europe/Istanbul": [
+  "Ankara",
+  "Izmir"
+ ],
+ "Europe/Kyiv": [
+  "Kiev",
+  "Lviv",
+  "Odesa"
+ ],
+ "Asia/Dubai": [
+  "Abu Dhabi",
+  "Sharjah"
+ ],
+ "America/Chicago": [
+  "Houston",
+  "Dallas",
+  "Austin",
+  "Minneapolis",
+  "New Orleans",
+  "Nashville",
+  "Milwaukee"
+ ],
+ "America/Denver": [
+  "Salt Lake City",
+  "Albuquerque",
+  "Boulder"
+ ],
+ "America/Los_Angeles": [
+  "San Francisco",
+  "San Jose",
+  "Seattle",
+  "San Diego",
+  "Portland",
+  "Silicon Valley",
+  "Bay Area"
+ ],
+ "America/New_York": [
+  "Boston",
+  "Miami",
+  "Philadelphia",
+  "Atlanta",
+  "Washington DC",
+  "Charlotte",
+  "Pittsburgh"
+ ],
+ "Asia/Ho_Chi_Minh": [
+  "Saigon",
+  "Hanoi",
+  "Da Nang"
+ ]
+}

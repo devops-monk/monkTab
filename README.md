@@ -63,6 +63,7 @@ Load `dist/` as an unpacked extension in `chrome://extensions`.
 ### Project Structure
 
 ```
+sounds/              # Bundled CC0 field recordings (see CREDITS-SOUNDS.md)
 src/
 ├── newtab/          # Main new tab page (HTML + CSS + TS)
 ├── background/      # MV3 service worker
@@ -71,8 +72,26 @@ src/
     ├── storage.ts   # chrome.storage helpers
     ├── weather.ts   # Open-Meteo wrapper
     ├── background.ts # Unsplash / fallback photos
+    ├── soundscapes.ts # Recorded loops + synthesised fallbacks
     └── quotes.ts    # Quotable API + fallbacks
 ```
+
+---
+
+## Soundscapes
+
+Nature scenes play **real CC0 field recordings** bundled in `sounds/` — no streaming,
+no network access, nothing to go offline. Each loop was trimmed to its most level-stable
+passage, loudness-matched, and given a 3-second equal-power crossfade at the loop point,
+so `loop = true` repeats seamlessly. Steady scenes (rain, wind, water) use 30-second
+loops; eventful ones (birds, crickets, fire, storm) use 60 seconds, where repetition
+would otherwise be noticeable.
+
+Noise colours (white/brown/pink) and binaural tones stay **synthesised** — they are
+defined mathematically, so a recording would only be a worse version of them. If a
+recording ever fails to load, that scene falls back to its synth automatically.
+
+Provenance and licensing for every clip is in [CREDITS-SOUNDS.md](CREDITS-SOUNDS.md).
 
 ---
 

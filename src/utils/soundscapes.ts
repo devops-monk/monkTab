@@ -1,4 +1,6 @@
-// All sounds synthesised with Web Audio API — no external URLs, 100% reliable.
+// Nature scenes play real CC0 field recordings bundled in `sounds/` (see SAMPLE_VARIANTS).
+// Everything else — noise colours, binaural tones, and any recording that fails to load —
+// is synthesised with the Web Audio API. No network access either way.
 
 let ctx: AudioContext | null = null;
 let masterGain: GainNode | null = null;
@@ -16,10 +18,127 @@ function getCtx(): AudioContext {
 
 function stopAll() {
   session++;
+  // Fade the recorded layer out first so stopping never clicks
+  if (sampleFade && ctx) {
+    const g = sampleFade, t = ctx.currentTime;
+    try {
+      g.gain.cancelScheduledValues(t);
+      g.gain.setValueAtTime(g.gain.value, t);
+      g.gain.linearRampToValueAtTime(0, t + FADE_OUT);
+    } catch { /* context closed */ }
+    const dying = activeSample;
+    setTimeout(() => { try { dying?.stop(); } catch { /* already stopped */ } }, FADE_OUT * 1000 + 60);
+    sampleFade = null; activeSample = null;
+  }
   activeNodes.forEach((n) => {
     try { (n as AudioBufferSourceNode).stop?.(); } catch { /* already stopped */ }
   });
   activeNodes = [];
+}
+
+// ── Recorded loops ────────────────────────────────────────────────────────────
+
+const FADE_IN = 1.2;
+const FADE_OUT = 0.5;
+
+/**
+ * Scenes backed by a real CC0 field recording in `sounds/<id>.ogg`.
+ * Keep in sync with the files actually shipped — anything listed here but missing
+ * falls back to its synth, and anything shipped but not listed is never played.
+ * See CREDITS-SOUNDS.md for the provenance of each recording.
+ */
+export const SAMPLE_VARIANTS = new Set<string>([
+  'rain-light', 'rain-heavy', 'rain-umbrella', 'rain-window',
+  'ocean-waves', 'ocean-beach', 'ocean-deep',
+  'storm',
+  'forest-morning', 'forest-night', 'forest-rain',
+  'fire-fireplace', 'fire-campfire', 'fire-candle',
+  'river-stream', 'river-waterfall',
+  'wind-gentle', 'wind-howl',
+  'garden',
+]);
+
+// A decoded 60s stereo loop is ~21 MB of RAM, so keep only the last few around.
+const SAMPLE_CACHE_MAX = 3;
+const sampleCache = new Map<string, AudioBuffer>();
+const samplePending = new Map<string, Promise<AudioBuffer>>();
+
+function cacheSample(id: string, buf: AudioBuffer) {
+  sampleCache.delete(id);
+  sampleCache.set(id, buf); // re-insert so Map iteration order is LRU
+  while (sampleCache.size > SAMPLE_CACHE_MAX) {
+    const oldest = sampleCache.keys().next().value;
+    if (oldest === undefined) break;
+    sampleCache.delete(oldest);
+  }
+}
+let activeSample: AudioBufferSourceNode | null = null;
+let sampleFade: GainNode | null = null;
+
+function sampleUrl(id: string): string {
+  // chrome.runtime is present on extension pages; fall back to a relative path elsewhere
+  return typeof chrome !== 'undefined' && chrome.runtime?.getURL
+    ? chrome.runtime.getURL(`sounds/${id}.ogg`)
+    : `/sounds/${id}.ogg`;
+}
+
+function loadSample(id: string): Promise<AudioBuffer> {
+  const cached = sampleCache.get(id);
+  if (cached) { cacheSample(id, cached); return Promise.resolve(cached); }
+  const inflight = samplePending.get(id);
+  if (inflight) return inflight;
+  const p = (async () => {
+    const res = await fetch(sampleUrl(id));
+    if (!res.ok) throw new Error(`sound ${id}: HTTP ${res.status}`);
+    const buf = await getCtx().decodeAudioData(await res.arrayBuffer());
+    cacheSample(id, buf);
+    return buf;
+  })();
+  samplePending.set(id, p);
+  p.catch(() => { /* surfaced by the caller */ }).finally(() => samplePending.delete(id));
+  return p;
+}
+
+/**
+ * Guard region baked into every loop file. Ogg Vorbis is not reliably gapless at file
+ * boundaries — the decoder's first and last samples carry encoder padding, which clicks
+ * on every repeat. Each file therefore wraps its body in PAD seconds of naturally
+ * continuing audio, and we loop strictly inside that, never touching the file edges.
+ */
+const LOOP_PAD = 0.25;
+
+/** Bodies are pre-crossfaded at build time, so looping inside the guards is seamless. */
+async function playSample(id: string, mySession: number): Promise<boolean> {
+  let buf: AudioBuffer;
+  try { buf = await loadSample(id); }
+  catch (e) { console.warn('[MonkTab] falling back to synth:', e); return false; }
+  if (mySession !== session) return true; // user switched sounds while decoding
+
+  const ac = getCtx();
+  if (ac.state === 'suspended') void ac.resume();
+  const fade = ac.createGain();
+  fade.gain.setValueAtTime(0.0001, ac.currentTime);
+  fade.gain.exponentialRampToValueAtTime(1, ac.currentTime + FADE_IN);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  // Loop the body only; start playback at the body too, so the head guard is never heard
+  const padded = buf.duration > LOOP_PAD * 3;
+  if (padded) {
+    src.loopStart = LOOP_PAD;
+    src.loopEnd = buf.duration - LOOP_PAD;
+  }
+  src.connect(fade);
+  fade.connect(masterGain!);
+  src.start(0, padded ? LOOP_PAD : 0);
+  activeSample = src;
+  sampleFade = fade;
+  return true;
+}
+
+/** Warm the cache so switching scenes is instant. */
+export function preloadSoundscape(variantId: string): void {
+  if (SAMPLE_VARIANTS.has(variantId)) void loadSample(variantId).catch(() => {});
 }
 
 // ── Noise buffer ─────────────────────────────────────────────────────────────
@@ -700,8 +819,16 @@ export function playSoundscape(variantId: string, volume: number) {
   const ac = getCtx();
   if (ac.state === 'suspended') ac.resume();
   masterGain!.gain.value = volume / 100;
-  const fn = SYNTH_MAP[variantId];
-  if (fn) fn(ac, masterGain!);
+  const mySession = session;
+
+  if (SAMPLE_VARIANTS.has(variantId)) {
+    void playSample(variantId, mySession).then((ok) => {
+      // Recording missing or undecodable — fall back to the synth so there's never silence
+      if (!ok && mySession === session) SYNTH_MAP[variantId]?.(ac, masterGain!);
+    });
+    return;
+  }
+  SYNTH_MAP[variantId]?.(ac, masterGain!);
 }
 
 export function stopSoundscape() {

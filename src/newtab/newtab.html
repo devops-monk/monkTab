@@ -31,14 +31,6 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
         Markets
       </button>
-      <button class="icon-btn hidden" id="btn-habits-toggle" title="Habits">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Habits
-      </button>
-      <button class="icon-btn hidden" id="btn-journal-toggle" title="Journal">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-        Journal
-      </button>
       <button class="icon-btn" id="btn-sessions-toggle" title="Tab Sessions (Alt+S)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="14" y2="12"/></svg>
         Sessions
@@ -502,13 +494,26 @@
           </div>
           <canvas id="yt-visualizer" class="yt-visualizer" width="280" height="44"></canvas>
 
+          <!-- Scrub bar -->
+          <div class="yt-scrub-row">
+            <span id="yt-elapsed" class="yt-elapsed">0:00</span>
+            <div id="yt-scrub" class="yt-scrub" role="slider" tabindex="0"
+                 aria-label="Seek" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+              <div class="yt-scrub-track">
+                <div id="yt-scrub-fill" class="yt-scrub-fill"></div>
+              </div>
+              <div id="yt-scrub-knob" class="yt-scrub-knob"></div>
+              <div id="yt-scrub-tip" class="yt-scrub-tip">0:00</div>
+            </div>
+            <span id="yt-duration" class="yt-elapsed">--:--</span>
+          </div>
+
           <!-- Seek row -->
           <div class="yt-np-seek-row">
             <button id="yt-seek-back" class="yt-seek-btn" title="Back 15 seconds">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
               <span>15</span>
             </button>
-            <span id="yt-elapsed" class="yt-elapsed">0:00</span>
             <button id="yt-seek-fwd" class="yt-seek-btn" title="Forward 15 seconds">
               <span>15</span>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-5"/></svg>
@@ -776,22 +781,6 @@
               </div>
               <label class="sw"><input type="checkbox" id="set-ai" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
             </div>
-            <div class="set-divider"></div>
-            <div class="set-row">
-              <div class="set-row-info">
-                <span class="set-row-title">Habit tracker</span>
-                <span class="set-row-desc">Daily habits with streaks</span>
-              </div>
-              <label class="sw"><input type="checkbox" id="set-habits" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
-            </div>
-            <div class="set-divider"></div>
-            <div class="set-row">
-              <div class="set-row-info">
-                <span class="set-row-title">Daily journal</span>
-                <span class="set-row-desc">Guided daily writing prompt</span>
-              </div>
-              <label class="sw"><input type="checkbox" id="set-journal" /><span class="sw-track"><span class="sw-thumb"></span></span></label>
-            </div>
           </div>
         </section>
 
@@ -851,113 +840,17 @@
               <span class="set-row-title">Your clocks</span>
             </div>
             <div id="clocks-config" class="clocks-chips"></div>
-            <select id="tz-preset" class="set-select" style="margin-top:12px">
-              <option value="">＋ Add a city…</option>
-              <optgroup label="🌎 Americas">
-                <option value="New York|America/New_York">🇺🇸 New York</option>
-                <option value="Los Angeles|America/Los_Angeles">🇺🇸 Los Angeles</option>
-                <option value="Chicago|America/Chicago">🇺🇸 Chicago</option>
-                <option value="Miami|America/New_York">🇺🇸 Miami</option>
-                <option value="Seattle|America/Los_Angeles">🇺🇸 Seattle</option>
-                <option value="Denver|America/Denver">🇺🇸 Denver</option>
-                <option value="Phoenix|America/Phoenix">🇺🇸 Phoenix</option>
-                <option value="Honolulu|Pacific/Honolulu">🇺🇸 Honolulu</option>
-                <option value="Anchorage|America/Anchorage">🇺🇸 Anchorage</option>
-                <option value="Toronto|America/Toronto">🇨🇦 Toronto</option>
-                <option value="Vancouver|America/Vancouver">🇨🇦 Vancouver</option>
-                <option value="Montreal|America/Toronto">🇨🇦 Montreal</option>
-                <option value="Mexico City|America/Mexico_City">🇲🇽 Mexico City</option>
-                <option value="Bogotá|America/Bogota">🇨🇴 Bogotá</option>
-                <option value="Lima|America/Lima">🇵🇪 Lima</option>
-                <option value="Santiago|America/Santiago">🇨🇱 Santiago</option>
-                <option value="Buenos Aires|America/Argentina/Buenos_Aires">🇦🇷 Buenos Aires</option>
-                <option value="São Paulo|America/Sao_Paulo">🇧🇷 São Paulo</option>
-                <option value="Caracas|America/Caracas">🇻🇪 Caracas</option>
-              </optgroup>
-              <optgroup label="🌍 Europe">
-                <option value="London|Europe/London">🇬🇧 London</option>
-                <option value="Dublin|Europe/Dublin">🇮🇪 Dublin</option>
-                <option value="Lisbon|Europe/Lisbon">🇵🇹 Lisbon</option>
-                <option value="Madrid|Europe/Madrid">🇪🇸 Madrid</option>
-                <option value="Paris|Europe/Paris">🇫🇷 Paris</option>
-                <option value="Brussels|Europe/Brussels">🇧🇪 Brussels</option>
-                <option value="Amsterdam|Europe/Amsterdam">🇳🇱 Amsterdam</option>
-                <option value="Zurich|Europe/Zurich">🇨🇭 Zurich</option>
-                <option value="Berlin|Europe/Berlin">🇩🇪 Berlin</option>
-                <option value="Vienna|Europe/Vienna">🇦🇹 Vienna</option>
-                <option value="Prague|Europe/Prague">🇨🇿 Prague</option>
-                <option value="Warsaw|Europe/Warsaw">🇵🇱 Warsaw</option>
-                <option value="Stockholm|Europe/Stockholm">🇸🇪 Stockholm</option>
-                <option value="Oslo|Europe/Oslo">🇳🇴 Oslo</option>
-                <option value="Copenhagen|Europe/Copenhagen">🇩🇰 Copenhagen</option>
-                <option value="Helsinki|Europe/Helsinki">🇫🇮 Helsinki</option>
-                <option value="Rome|Europe/Rome">🇮🇹 Rome</option>
-                <option value="Athens|Europe/Athens">🇬🇷 Athens</option>
-                <option value="Istanbul|Europe/Istanbul">🇹🇷 Istanbul</option>
-                <option value="Kyiv|Europe/Kyiv">🇺🇦 Kyiv</option>
-                <option value="Moscow|Europe/Moscow">🇷🇺 Moscow</option>
-                <option value="Budapest|Europe/Budapest">🇭🇺 Budapest</option>
-              </optgroup>
-              <optgroup label="🌍 Africa">
-                <option value="Cairo|Africa/Cairo">🇪🇬 Cairo</option>
-                <option value="Lagos|Africa/Lagos">🇳🇬 Lagos</option>
-                <option value="Nairobi|Africa/Nairobi">🇰🇪 Nairobi</option>
-                <option value="Johannesburg|Africa/Johannesburg">🇿🇦 Johannesburg</option>
-                <option value="Casablanca|Africa/Casablanca">🇲🇦 Casablanca</option>
-                <option value="Accra|Africa/Accra">🇬🇭 Accra</option>
-                <option value="Addis Ababa|Africa/Addis_Ababa">🇪🇹 Addis Ababa</option>
-                <option value="Dar es Salaam|Africa/Dar_es_Salaam">🇹🇿 Dar es Salaam</option>
-                <option value="Dakar|Africa/Dakar">🇸🇳 Dakar</option>
-              </optgroup>
-              <optgroup label="🌏 Middle East">
-                <option value="Dubai|Asia/Dubai">🇦🇪 Dubai</option>
-                <option value="Abu Dhabi|Asia/Dubai">🇦🇪 Abu Dhabi</option>
-                <option value="Riyadh|Asia/Riyadh">🇸🇦 Riyadh</option>
-                <option value="Doha|Asia/Qatar">🇶🇦 Doha</option>
-                <option value="Kuwait City|Asia/Kuwait">🇰🇼 Kuwait City</option>
-                <option value="Tel Aviv|Asia/Jerusalem">🇮🇱 Tel Aviv</option>
-                <option value="Baghdad|Asia/Baghdad">🇮🇶 Baghdad</option>
-                <option value="Tehran|Asia/Tehran">🇮🇷 Tehran</option>
-              </optgroup>
-              <optgroup label="🌏 South &amp; Central Asia">
-                <option value="Karachi|Asia/Karachi">🇵🇰 Karachi</option>
-                <option value="Mumbai|Asia/Kolkata">🇮🇳 Mumbai</option>
-                <option value="Delhi|Asia/Kolkata">🇮🇳 Delhi</option>
-                <option value="Kolkata|Asia/Kolkata">🇮🇳 Kolkata</option>
-                <option value="Bangalore|Asia/Kolkata">🇮🇳 Bangalore</option>
-                <option value="Dhaka|Asia/Dhaka">🇧🇩 Dhaka</option>
-                <option value="Kathmandu|Asia/Kathmandu">🇳🇵 Kathmandu</option>
-                <option value="Colombo|Asia/Colombo">🇱🇰 Colombo</option>
-                <option value="Tashkent|Asia/Tashkent">🇺🇿 Tashkent</option>
-                <option value="Almaty|Asia/Almaty">🇰🇿 Almaty</option>
-              </optgroup>
-              <optgroup label="🌏 East &amp; South-East Asia">
-                <option value="Yangon|Asia/Rangoon">🇲🇲 Yangon</option>
-                <option value="Bangkok|Asia/Bangkok">🇹🇭 Bangkok</option>
-                <option value="Jakarta|Asia/Jakarta">🇮🇩 Jakarta</option>
-                <option value="Kuala Lumpur|Asia/Kuala_Lumpur">🇲🇾 Kuala Lumpur</option>
-                <option value="Singapore|Asia/Singapore">🇸🇬 Singapore</option>
-                <option value="Manila|Asia/Manila">🇵🇭 Manila</option>
-                <option value="Hong Kong|Asia/Hong_Kong">🇭🇰 Hong Kong</option>
-                <option value="Taipei|Asia/Taipei">🇹🇼 Taipei</option>
-                <option value="Beijing|Asia/Shanghai">🇨🇳 Beijing</option>
-                <option value="Shanghai|Asia/Shanghai">🇨🇳 Shanghai</option>
-                <option value="Seoul|Asia/Seoul">🇰🇷 Seoul</option>
-                <option value="Tokyo|Asia/Tokyo">🇯🇵 Tokyo</option>
-                <option value="Osaka|Asia/Tokyo">🇯🇵 Osaka</option>
-                <option value="Ulaanbaatar|Asia/Ulaanbaatar">🇲🇳 Ulaanbaatar</option>
-                <option value="Vladivostok|Asia/Vladivostok">🇷🇺 Vladivostok</option>
-              </optgroup>
-              <optgroup label="🌏 Oceania">
-                <option value="Sydney|Australia/Sydney">🇦🇺 Sydney</option>
-                <option value="Melbourne|Australia/Melbourne">🇦🇺 Melbourne</option>
-                <option value="Brisbane|Australia/Brisbane">🇦🇺 Brisbane</option>
-                <option value="Perth|Australia/Perth">🇦🇺 Perth</option>
-                <option value="Auckland|Pacific/Auckland">🇳🇿 Auckland</option>
-                <option value="Suva|Pacific/Fiji">🇫🇯 Suva (Fiji)</option>
-                <option value="Guam|Pacific/Guam">🇬🇺 Guam</option>
-              </optgroup>
-            </select>
+            <div class="tz-picker">
+              <div class="tz-search-wrap">
+                <svg class="tz-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="tz-search" class="tz-search-input" type="text" autocomplete="off"
+                       spellcheck="false" role="combobox" aria-expanded="false"
+                       aria-controls="tz-results" aria-autocomplete="list"
+                       placeholder="Type a city or country — e.g. Bangalore, Kenya, Tokyo">
+                <button id="tz-clear" class="tz-clear hidden" title="Clear" type="button">✕</button>
+              </div>
+              <div id="tz-results" class="tz-results hidden" role="listbox"></div>
+            </div>
           </div>
         </section>
 
@@ -1331,7 +1224,7 @@
     <div class="news-panel-header">
       <div class="news-header-left">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8z"/></svg>
-        <span class="news-panel-title">Developer News</span>
+        <span class="news-panel-title">News</span>
         <span id="news-refresh-spinner" class="news-refresh-spinner hidden">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
         </span>
@@ -1374,7 +1267,7 @@
         </button>
         <button class="news-tab" data-ntab="google">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="none"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="none"/><path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z" fill="none"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="none"/></svg>
-          Google
+          World
         </button>
       </div>
     </div>
@@ -1384,48 +1277,9 @@
 
   </div>
 
-  <!-- Habit Tracker panel -->
-  <aside id="habits-panel" class="habits-panel hidden">
-    <div class="habits-header">
-      <span class="habits-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Today's Habits
-      </span>
-      <div class="habits-header-right">
-        <span id="habit-date" class="habit-date"></span>
-        <button id="btn-habits-close" class="icon-btn-sm" title="Close">✕</button>
-      </div>
-    </div>
-    <ul id="habit-list" class="habit-list"></ul>
-    <p id="habit-empty" class="habit-empty hidden">No habits yet — add one below</p>
-    <form id="habit-add-form" class="habit-add-form">
-      <input id="habit-emoji-input" class="habit-emoji-input" type="text" maxlength="2" placeholder="🎯" />
-      <input id="habit-label-input" class="habit-label-input" type="text" placeholder="e.g. Exercise 30 min" maxlength="40" autocomplete="off" />
-      <button type="submit" class="habit-add-btn" title="Add habit">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      </button>
-    </form>
-  </aside>
+  
 
-  <!-- Journal panel -->
-  <aside id="journal-panel" class="journal-panel hidden">
-    <div class="journal-header">
-      <span class="journal-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-        Daily Journal
-      </span>
-      <button id="btn-journal-close" class="icon-btn-sm" title="Close">✕</button>
-    </div>
-    <div class="journal-prompt-wrap">
-      <p id="journal-prompt" class="journal-prompt"></p>
-    </div>
-    <textarea id="journal-textarea" class="journal-textarea" placeholder="Write your thoughts…" rows="5" maxlength="2000"></textarea>
-    <div class="journal-meta">
-      <span id="journal-saved-badge" class="journal-saved-badge hidden">Saved ✓</span>
-      <button id="btn-journal-history" class="journal-history-btn">Past entries ▾</button>
-    </div>
-    <div id="journal-history" class="journal-history hidden"></div>
-  </aside>
+  
 
 
   <!-- Tab Sessions panel -->
@@ -1459,8 +1313,6 @@
       <div class="shortcuts-grid">
         <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>N</kbd><span class="sc-desc">Notes</span></div>
         <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>P</kbd><span class="sc-desc">Pomodoro</span></div>
-        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>H</kbd><span class="sc-desc">Habits</span></div>
-        <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>J</kbd><span class="sc-desc">Journal</span></div>
         <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>L</kbd><span class="sc-desc">Links</span></div>
         <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>M</kbd><span class="sc-desc">Music / Sounds</span></div>
         <div class="shortcut-row"><kbd>Alt</kbd><span>+</span><kbd>S</kbd><span class="sc-desc">Sessions</span></div>

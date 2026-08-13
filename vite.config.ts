@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import webExtension from 'vite-plugin-web-extension';
-import { copyFileSync, mkdirSync, existsSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 
 function copyIcons() {
@@ -19,6 +19,22 @@ function copyIcons() {
   };
 }
 
+// Bundled CC0 field recordings for the soundscape player
+function copySounds() {
+  return {
+    name: 'copy-sounds',
+    closeBundle() {
+      const srcDir = resolve(__dirname, 'sounds');
+      if (!existsSync(srcDir)) return;
+      const outDir = resolve(__dirname, 'dist/sounds');
+      if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
+      readdirSync(srcDir)
+        .filter((f) => f.endsWith('.ogg'))
+        .forEach((f) => copyFileSync(resolve(srcDir, f), resolve(outDir, f)));
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     tailwindcss(),
@@ -28,6 +44,7 @@ export default defineConfig({
       disableAutoLaunch: true,
     }),
     copyIcons(),
+    copySounds(),
   ],
   build: {
     outDir: 'dist',

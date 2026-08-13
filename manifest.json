@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "MonkTab — Developer New Tab",
   "short_name": "MonkTab",
-  "version": "1.0.8",
+  "version": "1.5.0",
   "description": "A beautiful, privacy-first new tab for developers. Clock, focus goal, todos, weather, quick links & Pomodoro — no account needed.",
   "icons": {
     "16": "icons/icon16.png",
@@ -25,6 +25,9 @@
     "bookmarks",
     "declarativeNetRequest"
   ],
+  "optional_permissions": [
+    "tabs"
+  ],
   "host_permissions": [
     "https://api.open-meteo.com/*",
     "https://geocoding-api.open-meteo.com/*",
@@ -39,6 +42,17 @@
     "https://api.alternative.me/*",
     "https://hn.algolia.com/*",
     "https://dev.to/*",
+    "https://github.com/*",
+    "https://openai.com/*",
+    "https://huggingface.co/*",
+    "https://deepmind.google/*",
+    "https://feeds.arstechnica.com/*",
+    "https://feeds.feedburner.com/*",
+    "https://krebsonsecurity.com/*",
+    "https://www.darkreading.com/*",
+    "https://aws.amazon.com/*",
+    "https://cloudblog.withgoogle.com/*",
+    "https://kubernetes.io/*",
     "https://www.reddit.com/*",
     "https://oauth.reddit.com/*",
     "https://ipapi.co/*",
