@@ -8,26 +8,46 @@ export interface Settings {
   showNotes: boolean;
   showWorldClocks: boolean;
   showCountdowns: boolean;
-  showGithub: boolean;
   showAi: boolean;
   showCalendar: boolean;
   theme: 'auto' | 'light' | 'dark';
   unsplashKey: string;
-  githubToken: string;
-  githubUsername: string;
+  /** Kept for backward compatibility; `aiProviders` is what the modal reads. */
   aiProvider: 'claude' | 'chatgpt' | 'gemini';
+  /** Every provider the Ask AI modal opens. More than one = side-by-side compare. */
+  aiProviders: string[];
   worldClocks: WorldClock[];
-  customBackgrounds: string[]; // data URLs, max 6
+  customBackgrounds: string[]; // data URLs or https image URLs, max 12
+  /** Where a non-custom background comes from. 'random' is the long-standing default. */
+  backgroundSource: 'random' | 'topic' | 'bing';
+  backgroundTopic: string;     // preset id or anything the user types
   activeBackground: 'daily' | 'custom';
   activeCustomBg: number; // index into customBackgrounds
   locationOverride: string; // empty = use device GPS
-  finnhubKey: string;
-  marketWatchlistCrypto: string[];
-  marketWatchlistStocks: string[];
 
   googleClientId: string; // Google OAuth client ID for Calendar
   quoteCategory: 'motivation' | 'stoic' | 'tech' | 'random';
   tempUnit: 'celsius' | 'fahrenheit';
+
+  // ── Focus mode ──
+  focusMins: number;
+  breakMins: number;
+  longBreakMins: number;
+  /** Focus rounds between long breaks. */
+  roundsPerLongBreak: number;
+  /** Roll straight into the next interval instead of waiting for a click. */
+  autoStartNext: boolean;
+  /** Dim and blur the wallpaper while focus mode is open. */
+  focusBlur: boolean;
+  /** Minutes of focus that count as a full day. */
+  dailyGoalMins: number;
+  todoSort: 'manual' | 'priority' | 'due';
+  /** Tasks shown as a small chip instead of the full panel. */
+  todosCollapsed: boolean;
+
+  // ── Quick links ──
+  linksView: 'list' | 'grid';
+  linksSort: 'manual' | 'frequent' | 'alpha';
 }
 
 export interface TabSession {
@@ -44,21 +64,40 @@ export interface Note {
   content: string;
   createdAt: number;
   updatedAt: number;
+  pinned?: boolean;
 }
 
+export interface Subtask {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+/** Everything past `done` is absent on tasks saved before 1.10.0. */
 export interface Todo {
   id: string;
   text: string;
   done: boolean;
   priority?: 'high' | 'medium' | 'none';
   dueDate?: string; // ISO date string YYYY-MM-DD
+  subtasks?: Subtask[];
+  /** Pomodoro rounds planned for this task, and how many have actually finished. */
+  estPomos?: number;
+  donePomos?: number;
+  /** Pulled into the Today list by hand, independent of any due date. */
+  today?: boolean;
+  createdAt?: number;
+  doneAt?: number;
 }
 
+/** `visits`/`lastVisit` are absent on links saved before 1.11.0. */
 export interface QuickLink {
   id: string;
   label: string;
   url: string;
   folderId?: string;
+  visits?: number;
+  lastVisit?: number;
 }
 
 export interface QuickLinkFolder {
@@ -82,6 +121,7 @@ export interface DailyState {
   focus: string;
   backgroundUrl: string;
   backgroundThumb: string;
+  backgroundCredit?: { text: string; url: string };
   quote: string;
   quoteAuthor: string;
 }
@@ -91,6 +131,14 @@ export interface WeatherForecastDay {
   icon: string;
   hi: number;
   lo: number;
+  pop?: number;  // max chance of precipitation, %
+}
+
+export interface WeatherHour {
+  label: string;  // "14:00", or "Now" for the current hour
+  icon: string;
+  temp: number;
+  pop: number;    // chance of precipitation, %
 }
 
 export interface WeatherCache {
@@ -103,6 +151,18 @@ export interface WeatherCache {
   city: string;
   cachedAt: number;
   forecast?: WeatherForecastDay[];
+  // Added in 1.9 — all optional so a cache written by an older build still loads
+  humidity?: number;
+  windDir?: number;     // degrees the wind is coming from
+  windGust?: number;
+  pressure?: number;    // hPa
+  uv?: number;
+  visibility?: number;  // metres
+  isDay?: boolean;
+  sunrise?: string;     // ISO local time
+  sunset?: string;
+  aqi?: number;         // European AQI
+  hourly?: WeatherHour[];
 }
 
 export interface FocusDay {
@@ -162,36 +222,46 @@ const DEFAULTS: Settings = {
   name: '',
   showWeather: true,
   showQuote: true,
-  showTodos: false,
+  showTodos: true,
   showLinks: true,
   showPomodoro: false,
   showNotes: true,
   showWorldClocks: true,
   showCountdowns: false,
-  showGithub: false,
   showAi: true,
   showCalendar: false,
   theme: 'dark',
   unsplashKey: '',
-  githubToken: '',
-  githubUsername: '',
   aiProvider: 'claude',
+  aiProviders: ['claude'],
   worldClocks: [
     { label: 'London', timezone: 'Europe/London' },
     { label: 'New York', timezone: 'America/New_York' },
     { label: 'Tokyo', timezone: 'Asia/Tokyo' },
   ],
   customBackgrounds: [],
+  backgroundSource: 'random',
+  backgroundTopic: 'nature',
   activeBackground: 'daily',
   activeCustomBg: 0,
   locationOverride: '',
-  finnhubKey: '',
-  marketWatchlistCrypto: ['bitcoin', 'ethereum', 'solana', 'binancecoin'],
-  marketWatchlistStocks: ['AAPL', 'NVDA', 'GOOGL', 'MSFT', 'TSLA'],
 
   googleClientId: '',
   quoteCategory: 'motivation',
   tempUnit: 'celsius',
+
+  focusMins: 25,
+  breakMins: 5,
+  longBreakMins: 15,
+  roundsPerLongBreak: 4,
+  autoStartNext: false,
+  focusBlur: true,
+  dailyGoalMins: 120,
+  todoSort: 'manual',
+  todosCollapsed: true,
+
+  linksView: 'list',
+  linksSort: 'manual',
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -335,14 +405,27 @@ export async function addYtBlockedId(id: string): Promise<void> {
   await chrome.storage.local.set({ mt_yt_blocked: ids.slice(-200) });
 }
 
+/** A stock the user is following. Crypto was dropped in 1.12.0. */
 export interface WatchItem {
   id: string;
-  symbol: string;            // display symbol, e.g. BTC, AAPL
-  type: 'crypto' | 'stock';
-  coinId?: string;           // CoinGecko ID for crypto (e.g. 'bitcoin')
-  alertPrice?: number;       // trigger price
+  symbol: string;            // ticker, e.g. AAPL
+  name?: string;             // company name, filled in when first resolved
+  addedAt?: number;
+
+  // Threshold alert — fires when the price crosses an absolute level
+  alertPrice?: number;
   alertDirection?: 'above' | 'below';
-  alertTriggered?: boolean;  // latched once fired
+
+  // Move alert — fires when the day's change passes ±N%
+  alertPct?: number;
+  alertPctDirection?: 'up' | 'down' | 'both';
+
+  /**
+   * The day each alert last fired (YYYY-MM-DD). Alerts latch so they cannot
+   * repeat all afternoon, and re-arm on the next day.
+   */
+  priceFiredOn?: string;
+  pctFiredOn?: string;
 }
 
 export async function getWatchlist(): Promise<WatchItem[]> {
@@ -405,5 +488,24 @@ export async function addAiHistory(prompt: string): Promise<void> {
   let history = await getAiHistory();
   history = history.filter(h => h !== prompt);
   history.unshift(prompt);
-  await chrome.storage.local.set({ mt_ai_history: history.slice(0, 20) });
+  await chrome.storage.local.set({ mt_ai_history: history.slice(0, 30) });
+}
+
+export async function removeAiHistory(prompt: string): Promise<void> {
+  const history = await getAiHistory();
+  await chrome.storage.local.set({ mt_ai_history: history.filter(h => h !== prompt) });
+}
+
+export async function clearAiHistory(): Promise<void> {
+  await chrome.storage.local.remove('mt_ai_history');
+}
+
+/** Prompts the user pinned for reuse. */
+export async function getAiPinned(): Promise<string[]> {
+  const r = await chrome.storage.local.get('mt_ai_pinned');
+  return (r['mt_ai_pinned'] as string[]) ?? [];
+}
+
+export async function saveAiPinned(prompts: string[]): Promise<void> {
+  await chrome.storage.local.set({ mt_ai_pinned: prompts.slice(0, 30) });
 }

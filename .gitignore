@@ -5,3 +5,7 @@ package-lock.json
 
 # Build artifacts
 *.zip
+
+# Store listing assets (regenerated locally, not part of the build)
+store-assets/
+store-screenshots/
