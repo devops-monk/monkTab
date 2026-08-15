@@ -3123,7 +3123,10 @@ function feedText(el: Element, ...names: string[]): string {
     const found = el.getElementsByTagName(n)[0]
       ?? el.getElementsByTagNameNS('*', n.split(':').pop()!)[0];
     const v = found?.textContent?.trim();
-    if (v) return v;
+    // Many publishers double-encode ("&amp;#8217;"), so the XML parser hands back
+    // the literal "&#8217;". Decode once here, at the single point every feed
+    // string passes through; it is re-escaped before it reaches the DOM.
+    if (v) return decodeEntities(v);
   }
   return '';
 }
