@@ -41,10 +41,15 @@ SLIDES = [
          sub='Pomodoro with long breaks, your task front and centre, lo-fi that keeps playing.',
          crop=(0.02, 0.0, 0.70, 0.62)),
 
-    dict(slug='sounds', src='Screenshot 2026-08-15 at 01.05.08.png',
-         head='Focus sounds that never buffer',
-         sub='31 ambient sounds across 13 scenes, bundled in — they work offline and never stream.',
-         crop=(0.30, 0.42, 0.70, 1.0)),
+    dict(slug='sounds', src='Screenshot 2026-08-15 at 01.04.56.png',
+         head='Lo-fi and ambient, built right in',
+         sub='Paste any YouTube mix, or drop into 31 bundled ambient sounds that work offline.',
+         crop=(0.31, 0.43, 0.69, 1.0)),
+
+    dict(slug='notes', src='Screenshot 2026-08-15 at 01.06.03.png',
+         head='Notes that live where you already are',
+         sub='A markdown workspace one keystroke away — write, preview, pin and search.',
+         crop=(0.14, 0.0, 0.53, 1.0)),
 
     dict(slug='news', src='Screenshot 2026-08-15 at 01.06.21.png',
          head='The whole dev world in one panel',
